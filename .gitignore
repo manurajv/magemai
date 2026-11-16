@@ -18,6 +18,9 @@ blob-report/
 *firebase-adminsdk*.json
 .secret.local
 
+# Local emulator export. Recreate with npm run emulators:seed. Do not commit.
+emulator-data/
+
 # Firebase local state and emulator logs
 .firebase/
 firebase-debug.log

@@ -19,7 +19,7 @@ No production domain is configured. Hosting, when it is deployed, uses the hostn
 - [Product blueprint](docs/magemai-blueprint.md) — the product specification.
 - [Architecture](docs/architecture.md) — data model, security, environments, and the open questions to confirm before implementation.
 - [Phase 1 checklist](docs/phase-1-checklist.md) — implementation steps 4–12 and the acceptance criteria.
-- [Environment setup](docs/setup.md) — Node.js, Firebase projects, emulators, environment variables, and super-admin provisioning.
+- [Environment setup](docs/setup.md) — Windows install, Node.js 24, JDK 21, the Emulator Suite, environment variables, and super-admin provisioning.
 
 ## Tenants
 
