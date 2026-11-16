@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Phase 1 step 4 placeholder. Step 9 replaces this with the real rules.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -4,7 +4,7 @@
 **Endorsement:** A Mavixas product  
 **Tagline:** Your business. Your own space.
 
-This guide is for local development against the Emulator Suite, and for the one cloud project the owner already has. The application is not scaffolded yet. Commands that depend on `package.json` or on `scripts/provision-super-admin.ts` are marked as available once the matching checklist step has landed. The contracts those commands must meet are in [architecture.md](./architecture.md).
+This guide is for local development against the Emulator Suite, and for the one cloud project the owner already has. Step 4 has added the Vite app, the design system, and the emulator scripts. `scripts/provision-super-admin.ts` and `npm run seed:platform-settings` are still later checklist steps. The contracts those commands must meet are in [architecture.md](./architecture.md).
 
 Do not deploy to `magemai` until the owner explicitly says so. Local work and automated tests use the Emulator Suite (`demo-magemai`) and do not need a paid Firebase plan. There is no separate dev or staging project. The mandatory rules are [Firebase Emulator-First Development Policy](./architecture.md#24-firebase-emulator-first-development-policy) in the architecture. Windows setup is section 2 of this guide. The commands in that policy are the step 4 contract. They do not work until that step lands.
 
@@ -12,10 +12,10 @@ Do not deploy to `magemai` until the owner explicitly says so. Local work and au
 
 | Tool | Version | Why |
 | --- | --- | --- |
-| Node.js | 24.x (Active LTS) | App, tests, and the Cloud Functions `nodejs24` runtime. The emulator runs functions on the local Node version, so a mismatch means tests do not match production. |
-| npm | the npm that ships with Node 24 | Package manager for the app and for functions. |
-| Java JDK | 21 or newer | Required by the Firebase emulators (Firestore). |
-| Firebase CLI | 15.0.0 or newer | Emulators require JDK 21 or newer, and the CLI recognizes the Node.js 24 runtime. |
+| Node.js | 24.x LTS recommended. 26.x supported for local development. | The app, tests, and npm scripts accept Node `>=24`. Cloud Functions still deploy as `nodejs24`. The emulator runs function source on the local Node version. |
+| npm | the npm that ships with that Node | Package manager for the app and for functions. npm 11 was used with Node 24 and Node 26. |
+| Java JDK | 21 or newer (Temurin 21.0.13 is a known-good build) | Required by the Firebase emulators (Firestore). |
+| Firebase CLI | 15.0.0 or newer (15.36.0 verified) | Emulators require JDK 21 or newer, and the CLI recognizes the Node.js 24 runtime. The repository also installs `firebase-tools` locally. |
 | Git | current | Clone and branch. |
 | A Google account | — | Firebase console and, later, Google sign-in configuration. |
 
@@ -24,7 +24,7 @@ Optional: a Node version manager so the machine stays on 24.x while other projec
 Check:
 
 ```bash
-node --version    # v24.x
+node --version    # v24.x recommended, or v26.x
 npm --version
 java -version     # 21 or newer
 firebase --version
@@ -41,7 +41,7 @@ firebase login
 
 ## 2. Windows setup
 
-These steps are for Windows 10 or Windows 11, using PowerShell. They install the tools. They do not create a Firebase project, and they do not deploy. Node.js is **24.x**, locked by decision D2, because Cloud Functions use the `nodejs24` runtime and the emulator runs functions on the local Node version. [OQ-26](./architecture.md#oq-26-package-manager-and-formatting) selects **npm** (the npm that ships with Node 24), ESLint, and Prettier. The commands below use npm.
+These steps are for Windows 10 or Windows 11, using PowerShell. They install the tools. They do not create a Firebase project, and they do not deploy. **Node.js 24 LTS is recommended. Node.js 26 is supported for local development.** The owner's PC uses Node.js 26.13.1 and JDK 21.0.13 (Temurin). Keep that Node 26 install. Cloud Functions still declare runtime `nodejs24`. `package.json` accepts Node `>=24` and this repository sets `engine-strict=false`, so npm install does not fail on Node 26. `.nvmrc` stays on `24` for a version manager that wants the recommended LTS. The Functions emulator runs function code on the local Node, so a Node 26 machine prints a warning that the requested runtime is 24 and then uses 26. Step 4 exports no business functions, so that warning does not change behavior. When functions are added, CI should run them on Node 24. [OQ-26](./architecture.md#oq-26-package-manager-and-formatting) selects **npm** (the npm that ships with the installed Node), ESLint, and Prettier. The commands below use npm.
 
 Open "Terminal" or "PowerShell" from the Start menu. You do not need "Run as administrator" for these installs if you install for the current user.
 
@@ -54,7 +54,7 @@ node --version
 npm --version
 ```
 
-`node --version` must print `v24.x`. If it prints an older version, an earlier install is still first on `PATH`. The installer path is usually `C:\Program Files\nodejs\`. Move that entry above older Node entries in Environment Variables → Path, then open a new terminal.
+`node --version` may print `v24.x` or `v26.x`. Both are accepted. `v24.x` is the recommended LTS. If it prints a version older than 24, an earlier install is still first on `PATH`. The installer path is usually `C:\Program Files\nodejs\`. Move that entry above older Node entries in Environment Variables → Path, then open a new terminal. Do not uninstall Node.js 26 just to match `.nvmrc`.
 
 **nvm-windows, if you already use it.** This is the Windows program named nvm-windows, not the Unix `nvm` script. In a new PowerShell:
 
@@ -64,13 +64,21 @@ nvm use 24
 node --version
 ```
 
+Node 26 is the other supported local version:
+
+```powershell
+nvm install 26
+nvm use 26
+node --version
+```
+
 If `nvm` is not recognized, Node was not installed that way. Use the installer above. Do not run both an installer Node and `nvm use` against different versions in the same terminal.
 
 ### 2.2 Java JDK 21
 
 The Firestore and Storage emulators are Java programs. Firebase CLI 15 and newer refuse to start them on Java older than 21. Install **JDK 21 or newer** (Temurin 21 LTS from [https://adoptium.net/](https://adoptium.net/) is a suitable build). The official Emulator Suite page still mentions JDK 11. That line is older than CLI 15. This project follows CLI 15: JDK 21 or newer.
 
-The Temurin installer can set `JAVA_HOME` if you leave that option checked. If `java` is not found, set it for the current user:
+Temurin 21.0.13 is a known-good build. The Temurin installer can set `JAVA_HOME` if you leave that option checked. If `java` is not found, set it for the current user:
 
 1. Start → search "Environment Variables" → "Edit environment variables for your account".
 2. New user variable `JAVA_HOME` = the JDK directory, for example `C:\Program Files\Eclipse Adoptium\jdk-21.0.x-hotspot`. Do not point it at the `bin` folder.
@@ -110,14 +118,15 @@ Do not set the policy to `Unrestricted`. `npm` and `node` are `.exe` files and a
 
 ### 2.4 Repository and install
 
-After step 4 has added `package.json`:
+`package.json` is in the repository. From the repository root, in PowerShell:
 
 ```powershell
 cd C:\path\to\magemai
 npm install
+npm install --prefix functions
 ```
 
-Until step 4, there is no `package.json`. The docs in `docs\` are the current contents.
+`npm install` warns, and does not fail, when Node is 26 and a dependency declares an older engine. `firebase-tools` pulls in `superstatic`, whose engine list is Node 20, 22, or 24. The CLI still runs on Node 26. The functions package declares `"node": "24"` so a deploy uses the `nodejs24` runtime. `functions/.npmrc` sets `engine-strict=false` so that install also succeeds on Node 26.
 
 ### 2.5 Emulator configuration
 
@@ -176,7 +185,7 @@ npm run emulators:seed
 npm run dev
 ```
 
-`emulators:seed` writes only the synthetic users and businesses in architecture section 24.9 (the `.test` emails and "Test Studio A" / "Test Studio B"). `npm run dev` starts Vite, usually at http://localhost:5173, and the app connects to `127.0.0.1` on the ports above.
+`emulators:seed` writes only the synthetic users and businesses in architecture section 24.9 (the `.test` emails and "Test Studio A" / "Test Studio B"), plus `platformSettings/global` from `shared/platform/defaults.ts` and one idempotent audit row. It does not create the pilot business. The Admin SDK may print a metadata-server warning on a PC that is not a Google Compute Engine VM. The seed sets `METADATA_SERVER_DETECTION=none` before it writes so that lookup is skipped. `npm run dev` starts Vite at http://127.0.0.1:5173, and the app connects to `127.0.0.1` on the ports above.
 
 Sign in as `owner.a@example.test` with password `emupass-not-for-live`. That password is created only in the Auth emulator.
 
@@ -192,6 +201,8 @@ npm run format
 ```
 
 `test:rules` and `test:e2e` go through `node scripts/emulators.mjs exec`, which runs `firebase emulators:exec --project demo-magemai`. If the project id were `magemai`, or an emulator host were missing, the script exits before any test. None of these commands deploys or deletes cloud data.
+
+At step 4, `npm run test:rules` checks that the emulator hosts are local. The security-rule cases in architecture section 20.4 arrive in step 9. `npm run test:e2e` is a smoke pass of the shell at desktop (1280×800), tablet (768×1024), and mobile (390×844). The register and onboarding flows arrive in step 10. `npm run preview` serves the production build with `vite preview`. There is still no `deploy` script.
 
 ### 2.9 Live project access and deploy
 
@@ -212,7 +223,7 @@ There is no `npm run deploy`. A deploy happens only after the owner explicitly a
 | Functions code changed and the emulator still runs the old function | Stop `npm run emulators:start` and start it again. A dependency change in `functions` needs the same restart after `npm install` inside `functions`. Do not deploy functions to see a local change. |
 | A script or JSON file behaves differently on Windows than in CI | Line endings. Step 4 adds `.gitattributes` so `*.ts`, `*.tsx`, `*.json`, `*.mjs`, `*.rules`, and `*.md` stay LF. If you already checked out CRLF, run `git add --renormalize .` after that file exists. EditorConfig or "files.eol": "\n" in the editor avoids new CRLF saves. |
 | The app shows data you did not seed, or the banner says LIVE FIREBASE | `.env.development.local` has the live opt-in. Remove `VITE_ALLOW_LIVE_FIREBASE` or set it to `false`, set `VITE_USE_FIREBASE_EMULATORS=true`, and restart `npm run dev`. |
-| `npm run emulators:start` is not found | Step 4 has not added the scripts yet. This guide describes the contract those scripts must meet. |
+| `npm run emulators:start` is not found | Run the command from the repository root after `npm install`. The script is `node scripts/emulators.mjs start`. |
 
 ## 3. Repository
 
@@ -221,13 +232,12 @@ git clone <the magemai repository url>
 cd magemai
 ```
 
-After workflow step 4 (foundation) has added the manifest:
-
 ```bash
 npm install
+npm install --prefix functions
 ```
 
-Until that step, there is nothing to install. Planning docs are in `docs/`.
+Planning docs remain in `docs/`.
 
 ## 4. Firebase projects
 
@@ -252,9 +262,9 @@ Enable Cloud Storage in the same region. Enable Authentication as in section 5. 
 
 ### 4.2 Local emulators
 
-Use the project id `demo-magemai` for every emulator run, including CI. `demo-` projects are reserved by the emulator and do not touch `magemai`. After step 4, start them with `npm run emulators:start` (section 2.6 and architecture section 24). That command is the only supported start path. It passes `--project demo-magemai` itself.
+Use the project id `demo-magemai` for every emulator run, including CI. `demo-` projects are reserved by the emulator and do not touch `magemai`. Start them with `npm run emulators:start` (section 2.6 and architecture section 24). That command is the only supported start path. It passes `--project demo-magemai` itself. Use Node 24 in CI so the Functions emulator matches the `nodejs24` runtime. Node 26 is supported on a developer PC.
 
-`.firebaserc` maps `default` to `magemai` so a deliberate deploy has one target. Emulator commands always pass `--project demo-magemai` and do not use that default. Do not add `dev`, `staging`, or `prod` aliases.
+`.firebaserc` maps `default` to `demo-magemai`. `npx firebase use` prints that id. A Firebase CLI command without `--project`, including a bare `firebase deploy`, stays on `demo-magemai` and does not touch the live project. The live project is available only as the alias `live`, so the operator must pass `--project live` or `--project magemai`. Do not run `firebase use live`, because that rewrites the default. Emulator commands still pass `--project demo-magemai` themselves. Do not add `dev`, `staging`, or `prod` aliases.
 
 ### 4.3 Safeguards
 
@@ -284,7 +294,7 @@ Google sign-in in the Emulator Suite does not contact Google. Automated tests us
 
 ## 6. Emulator Suite
 
-Ports, the `127.0.0.1` bind, and `singleProjectMode` are fixed in architecture section 24.1. Windows start, stop, import, export, seed, and the common failures are section 2. After step 4, from the repository root:
+Ports, the `127.0.0.1` bind, and `singleProjectMode` are fixed in architecture section 24.1. Windows start, stop, import, export, seed, and the common failures are section 2. From the repository root:
 
 ```text
 npm run emulators:start
@@ -385,7 +395,7 @@ Before the first functions deploy on a project:
 3. Add budget alerts at 50%, 90%, and 100%.
 4. Set a Cloud Run spend cap so a runaway functions deploy stops. Leave function minimum instances at 0.
 
-The owner is upgrading `magemai` to Blaze. Set the budget, the 50/90/100 percent alerts, and the Cloud Run spend cap on that billing account before the first functions deploy. There is no second cloud project. Skip cloud billing for as long as you stay on the emulators. Emulator work does not touch `magemai`.
+The owner is upgrading `magemai` to Blaze. Set the budget, the 50/90/100 percent alerts, and the Cloud Run spend cap on that billing account before the first functions deploy. There is no second cloud project. Skip cloud billing for as long as you stay on the emulators. Emulator work does not touch `magemai`. Step 4 did not deploy functions, Hosting, rules, or indexes.
 
 Scheduled database exports, which are the backup story before real tenant data lands in `magemai`, also need Blaze and a storage bucket. Turn them on as an operations task when that project is first deployed, not before.
 
@@ -488,7 +498,7 @@ Sign in at `/login` with that email. The super-admin area is `/super-admin`. A u
 
 ## 10. Local app
 
-After step 4, start the emulators first (`npm run emulators:start`), then in a second window:
+Start the emulators first (`npm run emulators:start`), then in a second window:
 
 ```text
 npm run dev
@@ -511,8 +521,10 @@ npm run build -- --mode production
 Then deploy. The command must print project id `magemai` and project number `122706427013` and wait until the operator types both. A wrapper added in the checklist does that before it invokes the CLI:
 
 ```bash
-firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting --project magemai
+firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting --project live
 ```
+
+`--project magemai` is the same target. A command that omits `--project` uses the `.firebaserc` default, `demo-magemai`, and does not deploy the live project.
 
 There is no staging project to deploy to first. This setup guide does not authorize the deploy. Do not aim a test command at `magemai`.
 
