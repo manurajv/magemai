@@ -1,0 +1,35 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+.vite/
+playwright-report/
+test-results/
+blob-report/
+*.tsbuildinfo
+
+# Environment files. Commit .env.example only (names, empty values).
+.env
+.env.*
+!.env.example
+
+# Service credentials. Never commit these.
+*serviceAccount*.json
+*firebase-adminsdk*.json
+.secret.local
+
+# Local emulator export. Recreate with npm run emulators:seed. Do not commit.
+emulator-data/
+
+# Firebase local state and emulator logs
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+storage-debug.log
+pglite-debug.log
+*-debug.log
+database-debug.log
+
+# OS and editor
+.DS_Store
