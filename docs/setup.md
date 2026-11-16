@@ -187,7 +187,7 @@ npm run dev
 
 `emulators:seed` writes only the synthetic users and businesses in architecture section 24.9 (the `.test` emails and "Test Studio A" / "Test Studio B"), plus `platformSettings/global` from `shared/platform/defaults.ts` and one idempotent audit row. It does not create the pilot business. The Admin SDK may print a metadata-server warning on a PC that is not a Google Compute Engine VM. The seed sets `METADATA_SERVER_DETECTION=none` before it writes so that lookup is skipped. `npm run dev` starts Vite at http://127.0.0.1:5173, and the app connects to `127.0.0.1` on the ports above.
 
-Sign in as `owner.a@example.test` with password `emupass-not-for-live`. That password is created only in the Auth emulator.
+Sign in as `owner.a@example.test` with password `emupass-not-for-live`. That password is created only in the Auth emulator. The same password is on `owner.b@example.test`, `staff.a@example.test`, `platform.admin@example.test`, and `unverified.a@example.test`. `unverified.a@example.test` has `emailVerified: false` and no business, so the app keeps that account on `/verify-email`. The other four seed users are verified. Do not reuse this password on the live project.
 
 ### 2.8 Tests, types, and lint
 
@@ -284,13 +284,17 @@ On project `magemai`, open Authentication → Sign-in method:
 2. Enable **Google**.
    - Set the OAuth consent-screen support email to `mavixas.ceo@gmail.com` on project `magemai`.
    - The consent screen can stay in testing while the product is private. Add the Google accounts that will sign in during testing as test users if the screen is in testing mode.
-   - Authorized domains: `localhost`, `magemai.web.app`, and `magemai.firebaseapp.com`. Do not add a custom domain.
+   - Authorized domains: `localhost`, `127.0.0.1`, `magemai.web.app`, and `magemai.firebaseapp.com`. Do not add a custom domain.
 3. Turn on **email enumeration protection** (Authentication → Settings → User actions).
 4. Leave phone authentication off. It is not part of Phase 1 and has its own billing.
 
-The web client shows the Google button only when `VITE_GOOGLE_AUTH_ENABLED=true`. Leave that variable empty until the provider is enabled for that project.
+The web client shows the Google button only when `VITE_GOOGLE_AUTH_ENABLED=true`. Leave that variable empty until the provider is enabled for that project. Step 5 does not enable Email/Password, Google, enumeration protection, authorized domains, or App Check on the live `magemai` project, and it does not turn on billing.
 
-Google sign-in in the Emulator Suite does not contact Google. Automated tests use the emulator's simulated Google provider. A real Google sign-in is a manual check on a project where this section is done.
+Google sign-in in the Emulator Suite does not contact Google. Automated tests use the emulator's simulated Google provider. `guardProviderSignIn` rejects a Google sign-in when that email already has a password, and the screen names the password method. Accounts are not linked. A real Google consent screen is a manual check on a project where this section is done.
+
+Callables do not set `enforceAppCheck`. The emulator would reject them if they required an App Check token. Before a production deploy, configure App Check with reCAPTCHA Enterprise and the site key in `VITE_FIREBASE_APP_CHECK_SITE_KEY` (section 6, App Check locally).
+
+A verification or reset email from the emulator is not delivered. The Auth emulator stores the code. Open `http://127.0.0.1:9099/emulator/v1/projects/demo-magemai/oobCodes`, copy the `oobCode`, and open `/auth/action?mode=verifyEmail&oobCode=...` or `/auth/action?mode=resetPassword&oobCode=...` on the Vite origin. `mode` is `verifyEmail` or `resetPassword`.
 
 ## 6. Emulator Suite
 
@@ -504,7 +508,7 @@ Start the emulators first (`npm run emulators:start`), then in a second window:
 npm run dev
 ```
 
-The Vite URL is printed in the terminal, usually http://localhost:5173. The app connects to the emulators on `127.0.0.1`. Create an account on `/register`, verify it through the emulator UI's out-of-band code, and return to the app. Onboarding is `/business/register`. For a repeatable set of users, run `npm run emulators:seed` instead of registering by hand (section 2.7).
+The Vite URL is printed in the terminal, usually http://127.0.0.1:5173. The app connects to the emulators on `127.0.0.1`. Create an account on `/register`. The app stays on `/verify-email` until the address is verified. Copy the emulator out-of-band code onto `/auth/action` (section 5), then choose "I've verified". The personal profile is `/profile`. `/business/register` is only a placeholder until the onboarding step. For a repeatable set of users, run `npm run emulators:seed` instead of registering by hand (section 2.7).
 
 Create businesses through that wizard. Do not add a hard-coded tenant.
 

@@ -8,11 +8,11 @@ Magemai is a multi-tenant platform for service businesses. Each business gets it
 
 ## Status
 
-Phase 1 step 4 (foundation and design system) is in this repository. The Vite app, shared UI, emulator scripts, and the Cloud Functions skeleton are here. Authentication, onboarding, dashboard data, and super-admin behavior are not.
+Phase 1 step 5 (authentication and personal profiles) is in this repository. Email and password registration, sign-in, email verification, password reset, Google redirect, and the personal profile are implemented against the Firebase emulators. Onboarding, dashboard data, business switching, and super-admin behavior are not.
 
 Phase 2 and later (bookings, marketplace, finance, collaboration, subscriptions) stay out of scope until the Phase 1 acceptance criteria pass.
 
-No production domain is configured. Hosting, when it is deployed, uses the hostname Firebase assigns to the project. Nothing in step 4 deploys to `magemai`.
+No production domain is configured. Hosting, when it is deployed, uses the hostname Firebase assigns to the project. Nothing in this step deploys to `magemai` or enables billing. Real Google sign-in on the live project needs the owner to enable the provider and add the authorized domains in [docs/setup.md](docs/setup.md).
 
 ## Local development
 

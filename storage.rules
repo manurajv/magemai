@@ -1,7 +1,23 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Phase 1 step 4 placeholder. Step 9 replaces this with the real rules.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAvatarImage() {
+      return request.resource != null
+        && request.resource.contentType.matches('image/(jpeg|png|webp)')
+        && request.resource.size > 0
+        && request.resource.size <= 2 * 1024 * 1024;
+    }
+
+    // Step 5: one avatar object per person. Every other path stays deny-all until step 9.
+    match /users/{userId}/avatar {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId && isAvatarImage();
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

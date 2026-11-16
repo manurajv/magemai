@@ -163,7 +163,9 @@ Phase 1 registers the routes it actually implements.
 | `/register` | public | Create a user account |
 | `/forgot-password` | public | Send a reset email |
 | `/verify-email` | signed-in, unverified | Holding screen and resend |
-| `/business/register` | verified user | Onboarding wizard |
+| `/auth/action` | public | Applies an email-verification or password-reset code |
+| `/profile` | signed-in | Personal profile. Not a business membership |
+| `/business/register` | verified user | Onboarding wizard. Step 5 keeps a placeholder on this path |
 | `/admin` | member | Overview |
 | `/admin/profile` | member | Business profile |
 | `/admin/settings` | member | Timezone, currency, language |
@@ -238,6 +240,7 @@ All callables require an authenticated user. Production deployments also require
 | Function | Caller | Effect |
 | --- | --- | --- |
 | `onAuthUserCreated` | Auth trigger | Creates the user document if missing. Forces `status: "active"`. Grants no claim. |
+| `guardProviderSignIn` | Auth blocking | Rejects a Google sign-in when that email already has a password provider. Does not link the accounts (OQ-7). Timeout is 7 seconds because Identity Platform caps blocking functions there. |
 | `syncAuthProfile` | That user | Copies `email` and `emailVerified` from the Auth record onto the user document and sets `lastLoginAt`. |
 | `checkSlugAvailability` | Verified user | Returns `{ available: boolean }`. |
 | `createBusiness` | Verified user | Transaction: slug reservation, business, owner membership, audit. |
@@ -299,7 +302,10 @@ emailVerified on the ID token?
 
 1. Email registration collects display name, email, and password. The client calls `createUserWithEmailAndPassword`, then `sendEmailVerification`.
 2. Google uses `signInWithRedirect` so mobile browsers and popup blockers share one path ([OQ-8](#oq-8-google-sign-in-interaction)).
-3. If Google reports that the email already belongs to a password account, the UI asks the person to sign in with the original method. Phase 1 does not link accounts automatically ([OQ-7](#oq-7-same-email-on-google-and-password)).
+3. If Google reports that the email already belongs to a password account, the UI asks the person to sign in with the original method. `guardProviderSignIn` rejects that sign-in before the account is linked. Phase 1 does not link accounts automatically ([OQ-7](#oq-7-same-email-on-google-and-password)).
+
+Step 5 does not load memberships. A verified user opens the existing `/admin` placeholder. The redirect to `/business/register` when there are no memberships arrives with steps 6 and 7. `/business/register` is registered now so the verification gate can be tested, and the page says onboarding is not yet implemented.
+
 4. Password reset uses `sendPasswordResetEmail`. Email enumeration protection is turned on in each Firebase project.
 5. Sign-out calls `signOut` and clears the active business hint from memory and `localStorage`.
 6. Route checks for "verified" read `user.emailVerified` on the Auth user (the ID token). They do not read the Firestore mirror. Callables check `request.auth.token.email_verified`.
@@ -1113,7 +1119,7 @@ No custom domain, no preview-channel requirement, and no server-side rendering i
 
 Scheduled Firestore exports to Cloud Storage are the backup story. They require Blaze and a bucket, and they should be turned on before `magemai` holds real tenant data. They are an operations task, not a Phase 1 feature.
 
-Auth settings on `magemai`: email/password enabled, Google enabled when the OAuth client exists, email enumeration protection on, authorized domains limited to localhost and `magemai.web.app` / `magemai.firebaseapp.com`.
+Auth settings on `magemai`: email/password enabled, Google enabled when the OAuth client exists, email enumeration protection on, authorized domains limited to `localhost`, `127.0.0.1`, `magemai.web.app`, and `magemai.firebaseapp.com`.
 
 ## 22. Firebase billing
 
@@ -1497,6 +1503,7 @@ It writes synthetic records and nothing else:
 | `owner.b@example.test` | `emupass-not-for-live` | Owner of business "Test Studio B", slug `test-studio-b` |
 | `staff.a@example.test` | `emupass-not-for-live` | Staff membership on Test Studio A |
 | `platform.admin@example.test` | `emupass-not-for-live` | `platformAdmins` status `active` and the emulator claim `superAdmin: true` |
+| `unverified.a@example.test` | `emupass-not-for-live` | Password account with `emailVerified: false`. No business. The verification gate keeps this user on `/verify-email` |
 
 It also writes `platformSettings/global` from `shared/platform/defaults.ts`. Emails use the reserved `.test` domain. Names are the labels above. The seed does not contain a real customer, a real inbox, or the pilot business named in the blueprint. Running it twice does not duplicate businesses: slug reservations make the second run a no-op for those slugs.
 

@@ -76,7 +76,7 @@ The blueprint's Phase 1 acceptance criteria. The step column is where the work h
 ### Dependencies that stay out of Phase 1
 
 - [x] Do not install FullCalendar, Recharts, a payment SDK, an i18n framework, or `date-fns-tz`.
-- [ ] Do install the libraries Phase 1 actually imports: React Hook Form, Zod, `@hookform/resolvers`, TanStack Query, TanStack Table, date-fns, Firebase. Step 4 installed Firebase and TanStack Query because the shell uses them. React Hook Form, Zod, `@hookform/resolvers`, TanStack Table, and date-fns stay out until a step imports them. The step 4 table is a plain HTML table.
+- [ ] Do install the libraries Phase 1 actually imports: React Hook Form, Zod, `@hookform/resolvers`, TanStack Query, TanStack Table, date-fns, Firebase. Step 4 installed Firebase and TanStack Query. Step 5 installed React Hook Form, Zod, and `@hookform/resolvers` because the auth and profile forms import them. TanStack Table and date-fns stay out until a step imports them. The step 4 table is a plain HTML table.
 
 ### Design system
 
@@ -103,26 +103,28 @@ Build these as real components, themed only by tokens, and use them in later ste
 
 Maps to AC-1, AC-2, AC-3, AC-4, AC-9, AC-14, AC-15.
 
-- [ ] `shared/validation` schemas for registration, login, forgot password, and profile.
-- [ ] `/register` creates an email/password account, collects display name, and sends verification.
-- [ ] `/login` signs in with email and password.
-- [ ] Google sign-in uses `signInWithRedirect`. The button is hidden when `VITE_GOOGLE_AUTH_ENABLED` is not `true`.
-- [ ] A Google attempt for an email that already uses a password shows the original-method error and does not link accounts (OQ-7).
-- [ ] `/forgot-password` sends the reset email.
-- [ ] `/verify-email` explains the wait, resends, reloads the user, and signs out.
-- [ ] Unverified users cannot open `/business/register`, `/admin`, or `/super-admin` (OQ-3).
-- [ ] `AuthProvider` uses `onAuthStateChanged` and `onIdTokenChanged`.
-- [ ] Guards show the loading state while auth is resolving, then redirect. They do not flash protected content.
-- [ ] Sign-out clears the session and the `magemai.activeBusinessId` hint.
-- [ ] Auth trigger `onAuthUserCreated` creates `users/{uid}` with `status: "active"` and no claim.
-- [ ] Client create of `users/{uid}` is restricted to the shape in architecture section 8.2, so a delayed trigger cannot be used to add fields.
-- [ ] `syncAuthProfile` copies `email` and `emailVerified` from the Auth record and sets `lastLoginAt`.
-- [ ] Profile screen updates only display name, phone, and locale. Phone is optional E.164.
-- [ ] Avatar upload goes to `users/{uid}/avatar` and is linked by `setUserAvatar`. The screen reads bytes with `getBlob`, not `getDownloadURL`.
-- [ ] Form validation and error messages for bad email, short password, and bad phone (AC-14).
-- [ ] Loading and error states on each auth form (AC-15).
-- [ ] Component tests: login validation, unverified holding screen, anonymous user redirected away from the dashboard.
-- [ ] Emulator test: registration leaves the ID token without `superAdmin` (XT-19).
+- [x] `shared/validation` schemas for registration, login, forgot password, and profile.
+- [x] `/register` creates an email/password account, collects display name, and sends verification.
+- [x] `/login` signs in with email and password.
+- [x] Google sign-in uses `signInWithRedirect`. The button is hidden when `VITE_GOOGLE_AUTH_ENABLED` is not `true`.
+- [x] A Google attempt for an email that already uses a password shows the original-method error and does not link accounts (OQ-7).
+- [x] `/forgot-password` sends the reset email.
+- [x] `/verify-email` explains the wait, resends, reloads the user, and signs out.
+- [x] Unverified users cannot open `/business/register`, `/admin`, or `/super-admin` (OQ-3).
+- [x] `AuthProvider` uses `onAuthStateChanged` and `onIdTokenChanged`.
+- [x] Guards show the loading state while auth is resolving, then redirect. They do not flash protected content.
+- [x] Sign-out clears the session and the `magemai.activeBusinessId` hint.
+- [x] Auth trigger `onAuthUserCreated` creates `users/{uid}` with `status: "active"` and no claim.
+- [x] Client create of `users/{uid}` is restricted to the shape in architecture section 8.2, so a delayed trigger cannot be used to add fields.
+- [x] `syncAuthProfile` copies `email` and `emailVerified` from the Auth record and sets `lastLoginAt`.
+- [x] Profile screen updates only display name, phone, and locale. Phone is optional E.164.
+- [x] Avatar upload goes to `users/{uid}/avatar` and is linked by `setUserAvatar`. The screen reads bytes with `getBlob`, not `getDownloadURL`.
+- [x] Form validation and error messages for bad email, short password, and bad phone (AC-14).
+- [x] Loading and error states on each auth form (AC-15).
+- [x] Component tests: login validation, unverified holding screen, anonymous user redirected away from the dashboard.
+- [x] Emulator test: registration leaves the ID token without `superAdmin` (XT-19).
+
+The AC-1 through AC-18 tracker stays open. Those boxes also depend on later steps.
 
 ## Step 6 — Onboarding and membership
 
