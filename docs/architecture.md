@@ -3,7 +3,7 @@
 **Product:** Magemai  
 **Endorsement:** A Mavixas product  
 **Tagline:** Your business. Your own space.  
-**Status:** Phase 1 planning. Application code is intentionally not in the repository yet.  
+**Status:** Phase 1 step 4 (foundation and design system) is in the repository. Authentication, onboarding, dashboard data, and super-admin behavior are not.  
 **Date:** 2026-11-16  
 **Revision:** Owner review of PR #1 approved the direction and locked the four decisions in section 3. Later the same review added the `platformAdmins` registry, named `magemai` as the only cloud project, and made the Emulator Suite mandatory for local development and for all future testing ([section 24](#24-firebase-emulator-first-development-policy)).  
 **Sources:** [Product blueprint](./magemai-blueprint.md) and the product owner's development instructions.
@@ -39,7 +39,7 @@ The pilot business named in the blueprint is an ordinary tenant. It is created l
 | ID | Decision |
 | --- | --- |
 | D1 | One React web application and one Cloud Functions codebase. Feature folders own UI, schemas, and data access. Pages do not call Firestore directly. |
-| D2 | Node.js 24 for the app, the Functions runtime (`nodejs24`), and CI. Functions are 2nd generation only. The package manager is npm. |
+| D2 | Node.js 24 LTS is recommended for the app, tests, and CI. Node.js 26 is supported for local development. `package.json` `engines` is `>=24`, `engine-strict` is off, and `.nvmrc` stays on 24. Cloud Functions stay on the `nodejs24` runtime. Functions are 2nd generation only. The package manager is npm. |
 | D3 | **Owner-approved.** Phase 1 platform data lives in root collections. Every tenant-owned document carries `businessId`. Future operational records live under `businesses/{businessId}/…` so the path is the tenant. |
 | D4 | A membership document id is `{businessId}_{userId}`. Rules and functions load it with one `get()`. Business role is never copied into a custom claim. |
 | D5 | Platform administration requires both the custom claim `superAdmin: true` and an active `platformAdmins/{uid}` document. Only an operator script using the Admin SDK may write that document. The claim alone never authorizes a sensitive read. Registration cannot grant either. |
@@ -53,7 +53,7 @@ The pilot business named in the blueprint is an ordinary tenant. It is created l
 | D13 | **Owner-approved.** Firestore and Cloud Functions are located in `asia-south1` (Mumbai). |
 | D14 | One cloud Firebase project, `magemai` (number `122706427013`). Local development and automated tests use the Emulator Suite with project id `demo-magemai`, and that remains the workflow after commercial launch (section 24). The project id is read from environment variables, so another project could be pointed at later without a code change. There is no dev, staging, or production project split. |
 
-The owner locked D3, D10, D12, and D13 in the review of PR #1. Later revisions do not reopen them. `platformAdmins` is another platform root collection under D3, not a new layout. D14 is the owner's later instruction about environments. The trade-offs behind D3–D10 are in the sections below.
+The owner locked D3, D10, D12, and D13 in the review of PR #1. Later revisions do not reopen them. `platformAdmins` is another platform root collection under D3, not a new layout. D14 is the owner's later instruction about environments. During step 4 the owner kept Node.js 26.13.1 on the Windows development PC, so D2 now recommends Node 24 LTS and also accepts Node 26 for local app tooling. The deployed Functions runtime remains `nodejs24`. The trade-offs behind D3–D10 are in the sections below.
 
 ## 4. Target folder structure
 
@@ -1094,7 +1094,7 @@ CI, added in step 10, runs `firebase emulators:exec` so a green test run include
 
 The npm script contract is section 24.11: `dev`, `emulators:start`, `emulators:export`, `emulators:reset`, `emulators:seed`, `test`, `test:rules`, `test:e2e`, `typecheck`, `lint`, and `format`. `npm run test:all` remains the CI entry and runs the same suites inside `firebase emulators:exec --project demo-magemai`. None of these scripts deploy, and none of them accept a project id of `magemai`.
 
-These scripts do not exist until step 4 and step 9. This planning pass does not claim they pass.
+Step 4 wired the scripts in section 24.11. `npm run test:rules` currently checks the emulator hosts. The rule cases in section 20.4, and `npm run test:all`, arrive with steps 9 and 10. This document does not claim those cases pass.
 
 ## 21. Deployment strategy
 
@@ -1375,7 +1375,7 @@ These defaults are enough to implement Phase 1 without another architecture pass
 
 This policy is mandatory. It applies to Phase 1 and to every later phase, including after commercial launch. Feature work and security testing run on the Emulator Suite. The cloud project remains the single project `magemai` (D14). There is no dev project and no staging project. D3, D10, D12, and D13 are unchanged.
 
-Step 4 implements the files and scripts in this section. Until those files exist, the commands below are the contract, not commands that work in this repository today.
+Step 4 added the files and scripts in this section. The commands below are the ones the repository runs. They always pass `--project demo-magemai`.
 
 ### 24.1 Emulators and ports
 

@@ -42,62 +42,62 @@ The blueprint's Phase 1 acceptance criteria. The step column is where the work h
 
 ### Tooling
 
-- [ ] Initialize Vite, React, and TypeScript with `strict` and `noUncheckedIndexedAccess`.
-- [ ] Pin Node.js 24 in `package.json` `engines`, in `functions` (`nodejs24`), and in the README/setup note if the required version changes.
-- [ ] Add Tailwind CSS and initialize shadcn/ui. Theme it from `src/styles/tokens.css` using the token table in architecture section 5.2.
-- [ ] Add Lucide.
-- [ ] Add React Router and the Phase 1 route table from architecture section 5.3. Do not register marketplace, booking, finance, or collaboration routes.
-- [ ] Add ESLint (`typescript-eslint`, React hooks) and Prettier. Treat `any` as an error.
-- [ ] Add Vitest, React Testing Library, and jsdom. Wire `npm test`.
-- [ ] Add the Firebase JS SDK and `src/lib/firebase/client.ts` as the only initializer (`getFirebase`). Connect Auth, Firestore, Storage, and Functions emulators on `127.0.0.1` at the ports in architecture section 24.1. Construct Functions for region `asia-south1`.
-- [ ] Connect emulators once. Reuse `getApps()`, and guard with `globalThis.__magemaiEmulatorsConnected` so a Vite HMR reload does not call `connectAuthEmulator` twice.
-- [ ] Development mode (`import.meta.env.DEV`) uses emulators when `VITE_ALLOW_LIVE_FIREBASE` is not `true`, including when `VITE_USE_FIREBASE_EMULATORS` is unset.
-- [ ] Production builds cannot connect to localhost. `vite.config.ts` throws during `vite build` when mode is `production` and `VITE_USE_FIREBASE_EMULATORS` is `true`. `getFirebase()` also throws if a production bundle still tries to use emulators.
-- [ ] Live Firebase during `npm run dev` requires both `VITE_USE_FIREBASE_EMULATORS=false` and `VITE_ALLOW_LIVE_FIREBASE=true` in gitignored `.env.development.local`, with `VITE_FIREBASE_PROJECT_ID=magemai`. Any other combination stays on emulators or throws, per the table in architecture section 24.6. The live path shows a non-dismissible banner reading `LIVE FIREBASE — project magemai. This is not the emulator. Writes affect the real project.` and the same sentence once via `console.warn`.
-- [ ] Add `firebase.json` with Auth 9099, Firestore 8080, Storage 9199, Functions 5001, Hosting 5000, and Emulator UI 4000, each host `127.0.0.1`, `ui.enabled` true, and `singleProjectMode` true. `.firebaserc` sets `default` to `magemai` only. Do not add dev, staging, or prod project aliases.
-- [ ] Add `.env.example` with the variable names from architecture section 19, including `VITE_ALLOW_LIVE_FIREBASE`, and empty values. `.env.development` sets `VITE_USE_FIREBASE_EMULATORS=true` and `VITE_FIREBASE_PROJECT_ID=demo-magemai`. `.env.production` is gitignored and, when created for a real build, targets `magemai` with the emulator flag off.
-- [ ] Add `scripts/emulators.mjs` and `scripts/seed-emulators.mjs`. The wrapper hardcodes `--project demo-magemai` and exits 1 if that id would be `magemai`, if `VITE_ALLOW_LIVE_FIREBASE` is `true`, or if `GOOGLE_APPLICATION_CREDENTIALS` is still set in an emulator child process.
-- [ ] `emulators:start` runs `firebase emulators:start --project demo-magemai` with `--export-on-exit ./emulator-data`, and `--import ./emulator-data` only when `emulator-data/firebase-export-metadata.json` exists.
-- [ ] `emulators:export` runs `firebase emulators:export ./emulator-data --project demo-magemai --force` against the already running suite.
-- [ ] `emulators:reset` deletes only the local `emulator-data` directory after checking the resolved path ends in `emulator-data`. It does not call the Firebase CLI.
-- [ ] `emulators:seed` runs inside `firebase emulators:exec --project demo-magemai` and writes only the synthetic users, businesses, and platform admin in architecture section 24.9. It refuses any other project id. It does not create the pilot business.
-- [ ] Keep `emulator-data/` gitignored. Do not commit an export.
-- [ ] `test:rules` and `test:e2e` run through `node scripts/emulators.mjs exec`, which spawns `firebase emulators:exec --project demo-magemai --only auth,firestore,functions,storage`. The exec exits 1 when `FIREBASE_AUTH_EMULATOR_HOST`, `FIRESTORE_EMULATOR_HOST`, or `FIREBASE_STORAGE_EMULATOR_HOST` is missing or is not `127.0.0.1` or `localhost`.
-- [ ] `npm test` does not construct a cloud app. If a unit test imports `getFirebase`, Vitest setup forces the emulator branch and the `demo-magemai` guard.
-- [ ] Wire the script names from architecture section 24.11 with cross-platform `node` / `tsc` / `eslint` / `prettier` bodies (no bash `rm`, assignment, or `source`): `dev`, `emulators:start`, `emulators:export`, `emulators:reset`, `emulators:seed`, `test`, `test:rules`, `test:e2e`, `typecheck`, `lint`, `format`.
-- [ ] No npm script deploys or targets `magemai`. There is no `deploy` script in that list. A later deploy helper prints project id `magemai` and project number `122706427013` and continues only after the operator types both, and only after the owner has approved that deploy.
-- [ ] No script deletes or overwrites collections on `magemai`. A later maintenance script of that kind must refuse that project id.
-- [ ] Add `.gitattributes` so `*.ts`, `*.tsx`, `*.json`, `*.mjs`, `*.rules`, and `*.md` use LF.
-- [ ] Document the budget alerts and Cloud Run spend cap for `magemai` in `docs/setup.md`, and do not deploy functions before they exist.
-- [ ] Confirm `.gitignore` excludes `.env.*` (except `.env.example`), service-account JSON, Firebase debug logs, and `emulator-data/`.
-- [ ] Add `shared/` and the Vite `@shared` alias. Functions consume the same folder.
-- [ ] Add `src/config/brand.ts` with the product name, endorsement, and tagline. Document title template `{page} · Magemai`.
+- [x] Initialize Vite, React, and TypeScript with `strict` and `noUncheckedIndexedAccess`.
+- [x] Accept Node.js `>=24` in the root `package.json` `engines`, keep `engine-strict` off, and leave `.nvmrc` on 24. Functions stay `nodejs24` in `firebase.json` and `functions/package.json`. README and `docs/setup.md` say Node 24 LTS is recommended and Node 26 is supported for local development. Verified on Node.js 26.13.1.
+- [x] Add Tailwind CSS and initialize shadcn/ui. Theme it from `src/styles/tokens.css` using the token table in architecture section 5.2.
+- [x] Add Lucide.
+- [ ] Add React Router and the Phase 1 route table from architecture section 5.3. Do not register marketplace, booking, finance, or collaboration routes. Step 4 registers `/`, `/login`, `/register`, `/admin`, `/super-admin`, and a development-only `/design-system`. `/forgot-password`, `/verify-email`, `/business/register`, `/admin/profile`, `/admin/settings`, and the super-admin list routes stay for steps 5–8.
+- [x] Add ESLint (`typescript-eslint`, React hooks) and Prettier. Treat `any` as an error.
+- [x] Add Vitest, React Testing Library, and jsdom. Wire `npm test`.
+- [x] Add the Firebase JS SDK and `src/lib/firebase/client.ts` as the only initializer (`getFirebase`). Connect Auth, Firestore, Storage, and Functions emulators on `127.0.0.1` at the ports in architecture section 24.1. Construct Functions for region `asia-south1`.
+- [x] Connect emulators once. Reuse `getApps()`, and guard with `globalThis.__magemaiEmulatorsConnected` so a Vite HMR reload does not call `connectAuthEmulator` twice.
+- [x] Development mode (`import.meta.env.DEV`) uses emulators when `VITE_ALLOW_LIVE_FIREBASE` is not `true`, including when `VITE_USE_FIREBASE_EMULATORS` is unset.
+- [x] Production builds cannot connect to localhost. `vite.config.ts` throws during `vite build` when mode is `production` and `VITE_USE_FIREBASE_EMULATORS` is `true`. `getFirebase()` also throws if a production bundle still tries to use emulators.
+- [x] Live Firebase during `npm run dev` requires both `VITE_USE_FIREBASE_EMULATORS=false` and `VITE_ALLOW_LIVE_FIREBASE=true` in gitignored `.env.development.local`, with `VITE_FIREBASE_PROJECT_ID=magemai`. Any other combination stays on emulators or throws, per the table in architecture section 24.6. The live path shows a non-dismissible banner reading `LIVE FIREBASE — project magemai. This is not the emulator. Writes affect the real project.` and the same sentence once via `console.warn`.
+- [x] Add `firebase.json` with Auth 9099, Firestore 8080, Storage 9199, Functions 5001, Hosting 5000, and Emulator UI 4000, each host `127.0.0.1`, `ui.enabled` true, and `singleProjectMode` true. `.firebaserc` sets `default` to `magemai` only. Do not add dev, staging, or prod project aliases.
+- [x] Add `.env.example` with the variable names from architecture section 19, including `VITE_ALLOW_LIVE_FIREBASE`, and empty values. `.env.development` sets `VITE_USE_FIREBASE_EMULATORS=true` and `VITE_FIREBASE_PROJECT_ID=demo-magemai`. That file is gitignored, so it is created on the developer machine and is not committed. Development mode uses the emulator defaults even when the file is absent. `.env.production` is gitignored and, when created for a real build, targets `magemai` with the emulator flag off.
+- [x] Add `scripts/emulators.mjs` and `scripts/seed-emulators.mjs`. The wrapper hardcodes `--project demo-magemai` and exits 1 if that id would be `magemai`, if `VITE_ALLOW_LIVE_FIREBASE` is `true`, or if `GOOGLE_APPLICATION_CREDENTIALS` is still set in an emulator child process.
+- [x] `emulators:start` runs `firebase emulators:start --project demo-magemai` with `--export-on-exit ./emulator-data`, and `--import ./emulator-data` only when `emulator-data/firebase-export-metadata.json` exists.
+- [x] `emulators:export` runs `firebase emulators:export ./emulator-data --project demo-magemai --force` against the already running suite.
+- [x] `emulators:reset` deletes only the local `emulator-data` directory after checking the resolved path ends in `emulator-data`. It does not call the Firebase CLI.
+- [x] `emulators:seed` runs inside `firebase emulators:exec --project demo-magemai` and writes only the synthetic users, businesses, and platform admin in architecture section 24.9, plus `platformSettings/global` and one idempotent audit row. It refuses any other project id. It does not create the pilot business.
+- [x] Keep `emulator-data/` gitignored. Do not commit an export.
+- [x] `test:rules` and `test:e2e` run through `node scripts/emulators.mjs exec`, which spawns `firebase emulators:exec --project demo-magemai --only auth,firestore,functions,storage`. The exec exits 1 when `FIREBASE_AUTH_EMULATOR_HOST`, `FIRESTORE_EMULATOR_HOST`, or `FIREBASE_STORAGE_EMULATOR_HOST` is missing or is not `127.0.0.1` or `localhost`. Step 4's rules test is the host guard. The rule cases in architecture section 20.4 arrive in step 9. The Playwright run is a shell smoke, not the step 10 flows.
+- [x] `npm test` does not construct a cloud app. If a unit test imports `getFirebase`, Vitest setup forces the emulator branch and the `demo-magemai` guard.
+- [x] Wire the script names from architecture section 24.11 with cross-platform `node` / `tsc` / `eslint` / `prettier` bodies (no bash `rm`, assignment, or `source`): `dev`, `emulators:start`, `emulators:export`, `emulators:reset`, `emulators:seed`, `test`, `test:rules`, `test:e2e`, `typecheck`, `lint`, `format`. `preview` is also present for `vite preview`.
+- [x] No npm script deploys or targets `magemai`. There is no `deploy` script in that list. A later deploy helper prints project id `magemai` and project number `122706427013` and continues only after the operator types both, and only after the owner has approved that deploy.
+- [x] No script deletes or overwrites collections on `magemai`. A later maintenance script of that kind must refuse that project id.
+- [x] Add `.gitattributes` so `*.ts`, `*.tsx`, `*.json`, `*.mjs`, `*.rules`, and `*.md` use LF.
+- [x] Document the budget alerts and Cloud Run spend cap for `magemai` in `docs/setup.md`, and do not deploy functions before they exist. Step 4 did not deploy functions.
+- [x] Confirm `.gitignore` excludes `.env.*` (except `.env.example`), service-account JSON, Firebase debug logs, and `emulator-data/`.
+- [x] Add `shared/` and the Vite `@shared` alias. Functions consume the same folder.
+- [x] Add `src/config/brand.ts` with the product name, endorsement, and tagline. Document title template `{page} · Magemai`.
 
 ### Dependencies that stay out of Phase 1
 
-- [ ] Do not install FullCalendar, Recharts, a payment SDK, an i18n framework, or `date-fns-tz`.
-- [ ] Do install the libraries Phase 1 actually imports: React Hook Form, Zod, `@hookform/resolvers`, TanStack Query, TanStack Table, date-fns, Firebase.
+- [x] Do not install FullCalendar, Recharts, a payment SDK, an i18n framework, or `date-fns-tz`.
+- [ ] Do install the libraries Phase 1 actually imports: React Hook Form, Zod, `@hookform/resolvers`, TanStack Query, TanStack Table, date-fns, Firebase. Step 4 installed Firebase and TanStack Query because the shell uses them. React Hook Form, Zod, `@hookform/resolvers`, TanStack Table, and date-fns stay out until a step imports them. The step 4 table is a plain HTML table.
 
 ### Design system
 
 Build these as real components, themed only by tokens, and use them in later steps. Do not build every dashboard page in this step.
 
-- [ ] Logo placeholder that reads the product name from `brand.ts`.
-- [ ] Typography styles from the token font (self-hosted Inter).
-- [ ] Button, input, select, dialog, dropdown, card, table.
-- [ ] Sidebar and header, including the collapsed drawer below `lg`.
-- [ ] Toast notifications.
-- [ ] Loading state, empty state, and error state with a retry action.
-- [ ] Coming soon presentation (disabled, labeled, not a link).
-- [ ] Responsive behavior checked at mobile, tablet, and desktop widths for the shell primitives.
-- [ ] Component tests for loading, empty, and error states (AC-15).
+- [x] Logo placeholder that reads the product name from `brand.ts`.
+- [x] Typography styles from the token font (self-hosted Inter).
+- [x] Button, input, select, dialog, dropdown, card, table.
+- [x] Sidebar and header, including the collapsed drawer below `lg`.
+- [x] Toast notifications.
+- [x] Loading state, empty state, and error state with a retry action.
+- [x] Coming soon presentation (disabled, labeled, not a link).
+- [x] Responsive behavior checked at mobile, tablet, and desktop widths for the shell primitives.
+- [x] Component tests for loading, empty, and error states (AC-15). The AC-15 tracker stays open until the later steps use those states on real forms and dashboards.
 
 ### App skeleton
 
-- [ ] Providers: query client, auth (can be a stub until step 5), toasts.
-- [ ] Layouts: auth layout, dashboard layout, super-admin layout.
-- [ ] A route renders each layout without fake business data.
-- [ ] `npm test` and the Vite production build succeed before step 5 starts.
+- [x] Providers: query client, auth (can be a stub until step 5), toasts.
+- [x] Layouts: auth layout, dashboard layout, super-admin layout.
+- [x] A route renders each layout without fake business data.
+- [x] `npm test` and the Vite production build succeed before step 5 starts.
 
 ## Step 5 — Authentication
 

@@ -1,0 +1,9 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Phase 1 step 4 placeholder. Step 9 replaces this with the real rules.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

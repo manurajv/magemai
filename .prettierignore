@@ -1,0 +1,14 @@
+node_modules
+dist
+coverage
+functions/lib
+functions/node_modules
+playwright-report
+test-results
+blob-report
+emulator-data
+.firebase
+package-lock.json
+
+# Planning docs use hand-aligned tables. Prettier rewrites every cell.
+docs/**/*.md
