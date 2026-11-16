@@ -4,9 +4,9 @@
 **Endorsement:** A Mavixas product  
 **Tagline:** Your business. Your own space.
 
-This guide is for local development and for creating the Firebase projects Phase 1 will use. The application is not scaffolded yet. Commands that depend on `package.json` or on `scripts/provision-super-admin.ts` are marked as available once the matching checklist step has landed. The contracts those commands must meet are in [architecture.md](./architecture.md).
+This guide is for local development against the Emulator Suite, and for the one cloud project the owner already has. The application is not scaffolded yet. Commands that depend on `package.json` or on `scripts/provision-super-admin.ts` are marked as available once the matching checklist step has landed. The contracts those commands must meet are in [architecture.md](./architecture.md).
 
-Do not deploy production, and do not deploy staging, until the owner explicitly says so. Local work uses the Emulator Suite and does not need a paid Firebase plan.
+Do not deploy to `magemai` until the owner explicitly says so. Local work and automated tests use the Emulator Suite (`demo-magemai`) and do not need a paid Firebase plan. There is no separate dev or staging project.
 
 ## 1. Prerequisites
 
@@ -54,40 +54,56 @@ npm install
 
 Until that step, there is nothing to install. Planning docs are in `docs/`.
 
-## 3. Create the Firebase projects
+## 3. Firebase projects
 
-Create three projects in the [Firebase console](https://console.firebase.google.com/). Suggested ids, which you may change:
+### 3.1 Live project
 
-| Environment | Suggested id | Alias in `.firebaserc` |
-| --- | --- | --- |
-| Development | `magemai-dev` | `dev` |
-| Staging | `magemai-staging` | `staging` |
-| Production | `magemai-prod` | `prod` |
+The owner already has the only cloud project. Do not create a dev, staging, or production project. Do not put web API keys in the repository. Those public config values go in a gitignored env file later (section 6). The variables are what a later project would change. Source code does not hardcode a second project.
 
-The ids are yours. The docs do not assume a specific id, and they do not name a custom domain.
+| | Value |
+| --- | --- |
+| Project id | `magemai` |
+| Project number | `122706427013` |
+| Support email | `mavixas.ceo@gmail.com` |
+| Billing | Being upgraded to the Blaze plan by the owner |
+| Region | `asia-south1` (Mumbai) for Firestore and for Cloud Functions. Owner-approved. The Firestore location cannot be changed after the database is created. |
+| Assigned hostnames | `magemai.web.app` and `magemai.firebaseapp.com` |
 
-For **each** project, before the first database write:
+Confirm in the console that the project number is `122706427013` before running an operator script, so the credentials are for this project and not a different one named similarly.
 
-1. Upgrade billing only when you are about to deploy Cloud Functions. See section 7. Emulator-only work can stay on the Spark plan.
-2. Set the default Google Cloud resource location to **`asia-south1` (Mumbai)** unless open question OQ-1 in the architecture was overridden. Firestore cannot be moved afterward. Functions use the same region.
-3. Add a web app in Project settings. Copy the SDK config into the env file for that environment (section 6). You do not need to turn on Firebase Hosting's GitHub integration.
-4. Enable Cloud Firestore in production mode (rules deny by default; the committed `firestore.rules` replace the console placeholder at deploy time).
-5. Enable Cloud Storage. Use the same region.
-6. Enable Authentication (section 4).
+When Cloud Firestore is enabled, choose `asia-south1`. If the database already exists in another region, stop. Do not create a second database to work around it, and do not deploy Functions elsewhere. Tell the owner, because D13 is a locked decision.
 
-You can develop entirely on emulators before these projects exist. Use the project id `demo-magemai` for emulator runs. `demo-` projects are reserved by the emulator and do not touch a real cloud project.
+Enable Cloud Storage in the same region. Enable Authentication as in section 4. Add a web app in Project settings and copy the SDK config into the gitignored env file. Leave the values out of git. Hosting's GitHub integration is not required.
 
-After step 4, `.firebaserc` maps aliases to the real ids on each machine. Do not commit a file that you are not prepared to share; project ids are not secret, service accounts are.
+### 3.2 Local emulators
+
+Use the project id `demo-magemai` for every emulator run, including CI. `demo-` projects are reserved by the emulator and do not touch `magemai`.
+
+```bash
+firebase emulators:start --project demo-magemai
+```
+
+`.firebaserc` maps `default` to `magemai` so a deliberate deploy has one target. Emulator commands always pass `--project demo-magemai` and do not use that default. Do not add `dev`, `staging`, or `prod` aliases.
+
+### 3.3 Safeguards
+
+`magemai` is the only cloud database. A test or a bad script cannot be aimed at a disposable project, because there isn't one.
+
+- Day-to-day development and every automated test use the emulators. `.env.development` sets `VITE_USE_FIREBASE_EMULATORS=true` and `VITE_FIREBASE_PROJECT_ID=demo-magemai`.
+- Do not run the rules suite, Playwright, an emulator import, or any script that deletes or overwrites collections against `magemai`. Test commands must fail if they see that project id.
+- Seed and super-admin scripts may write to `magemai` only after the operator types the project id `magemai` and the project number `122706427013`.
+- `firebase deploy` is not part of test runs. It runs only after the owner has said to deploy, and only after the same typed confirmation. Section 10.
+- Set budget alerts on `magemai` before the first functions deploy. Section 7.
 
 ## 4. Authentication providers
 
-In each cloud project, open Authentication → Sign-in method:
+On project `magemai`, open Authentication → Sign-in method:
 
 1. Enable **Email/Password**. Leave email link (passwordless) off.
 2. Enable **Google**.
-   - Set a support email on the OAuth consent screen.
+   - Set the OAuth consent-screen support email to `mavixas.ceo@gmail.com` on project `magemai`.
    - The consent screen can stay in testing while the product is private. Add the Google accounts that will sign in during testing as test users if the screen is in testing mode.
-   - Authorized domains: `localhost`, and the project's `web.app` and `firebaseapp.com` hostnames. Do not add a custom domain.
+   - Authorized domains: `localhost`, `magemai.web.app`, and `magemai.firebaseapp.com`. Do not add a custom domain.
 3. Turn on **email enumeration protection** (Authentication → Settings → User actions).
 4. Leave phone authentication off. It is not part of Phase 1 and has its own billing.
 
@@ -146,8 +162,7 @@ Vite loads env files by mode. Create them locally. Only `.env.example` is commit
 | --- | --- | --- |
 | `.env.example` | documentation | yes, empty values |
 | `.env.development` | local `vite` dev server | no |
-| `.env.staging` | `vite build --mode staging` | no |
-| `.env.production` | `vite build` | no |
+| `.env.production` | `vite build` aimed at `magemai` | no |
 
 Names:
 
@@ -173,11 +188,13 @@ VITE_FIREBASE_PROJECT_ID=demo-magemai
 VITE_GOOGLE_AUTH_ENABLED=true
 ```
 
-The other `VITE_FIREBASE_*` keys can be the development web-app config or any non-empty placeholder when the emulator flag is on. They are the public web config. They are not a service account, and they are safe to ship in a frontend bundle. They still do not belong in a ticket or a screenshot of a production project if you can avoid it.
+The other `VITE_FIREBASE_*` keys can be any non-empty placeholder when the emulator flag is on. Local tests keep `VITE_FIREBASE_PROJECT_ID=demo-magemai`.
 
-Staging and production files set `VITE_USE_FIREBASE_EMULATORS=false` (or leave it unset) and use that project's web config. The client throws on startup if a production build sees the emulator flag set to `true`.
+A build aimed at the live project uses `.env.production`. It sets `VITE_USE_FIREBASE_EMULATORS=false` and `VITE_FIREBASE_PROJECT_ID=magemai`, and fills the other `VITE_FIREBASE_*` keys from the web app config in the Firebase console for project number `122706427013`. Those values are public web config, not a service account. They are still not committed. Copy them into the gitignored env file when a cloud build is actually needed. This documentation change does not add them. Another project later would be a different gitignored env file with a different `VITE_FIREBASE_PROJECT_ID`. Do not add that file now.
 
-`VITE_FIREBASE_APP_CHECK_SITE_KEY` is empty locally and set in staging and production after App Check is configured.
+The client throws on startup if a production build sees the emulator flag set to `true`.
+
+`VITE_FIREBASE_APP_CHECK_SITE_KEY` is empty locally and set in `.env.production` after App Check is configured on `magemai`.
 
 Never create a `VITE_` variable that contains a private key, a service-account JSON, or an OAuth client secret.
 
@@ -206,71 +223,82 @@ Before the first functions deploy on a project:
 3. Add budget alerts at 50%, 90%, and 100%.
 4. Set a Cloud Run spend cap so a runaway functions deploy stops. Leave function minimum instances at 0.
 
-Do this separately for development, staging, and production if each one will host functions. Skip it for as long as you stay on the emulators.
+The owner is upgrading `magemai` to Blaze. Set the budget, the 50/90/100 percent alerts, and the Cloud Run spend cap on that billing account before the first functions deploy. There is no second cloud project. Skip cloud billing for as long as you stay on the emulators. Emulator work does not touch `magemai`.
 
-Scheduled database exports, which are the backup story before real tenant data lands in production, also need Blaze and a storage bucket. Turn them on as an operations task when production is first deployed, not before.
+Scheduled database exports, which are the backup story before real tenant data lands in `magemai`, also need Blaze and a storage bucket. Turn them on as an operations task when that project is first deployed, not before.
 
 ## 8. Platform seed and super-admin provisioning
 
-Both scripts are implemented in the checklist (seed in step 6, provisioning in step 8). Until they exist, do not hand-edit a user document to fake an administrator. There is no document field that grants access. The grant is a custom claim set by the Admin SDK.
+Both scripts are implemented in the checklist (seed in step 6, provisioning in step 8). Until they exist, do not hand-edit Firestore to fake an administrator. Platform access requires both the custom claim `superAdmin: true` and `platformAdmins/{uid}` with `status` `active`. Clients cannot write that collection. The operator script is the only supported writer. Architecture section 17.3 is the contract, including order, idempotence, and partial failure.
 
 ### 8.1 Service account
 
-For each cloud project that needs a seed or a super-admin:
+For `magemai`:
 
-1. In Google Cloud console → IAM → Service accounts, create an account used only for Magemai operator scripts. Name it for the environment, for example `magemai-operator-dev`.
+1. In Google Cloud console, select project number `122706427013` (`magemai`). Create a service account used only for Magemai operator scripts, for example `magemai-operator`.
 2. Grant it **Firebase Authentication Admin** and **Cloud Datastore User** on that project only.
 3. Create a JSON key and store it outside the repository. A reasonable location is a directory your home folder owns and the repo is not inside.
 4. Confirm `git status` does not list the JSON file. `.gitignore` rejects `*serviceAccount*.json` and `*firebase-adminsdk*.json`.
 
-Development, staging, and production use different service accounts. A claim written in one project does nothing in the others.
+This service account is for `magemai` only. The emulator does not use it. If a second cloud project is ever introduced, it gets its own key. Do not reuse this one.
 
-The emulator does not need this file. Tests set the `superAdmin` claim through the Auth emulator's admin interface.
+The emulator does not need this file. Tests set the claim and the registry document through the emulator's admin interface, against `demo-magemai` only.
 
 ### 8.2 Seed platform settings
 
-After step 6, against a cloud project or, for local data, against the emulator as the script's `--project` flag documents:
+Day-to-day seeding runs against the emulator (`demo-magemai`) and does not use a cloud key. The test harness does the same.
+
+Against `magemai`, only when the owner wants the live settings document, and only after typing the project id and the project number:
 
 ```bash
 GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/outside/the/repo/service-account.json \
-npm run seed:platform-settings -- --project <firebase-project-id>
+npm run seed:platform-settings -- --project magemai
 ```
 
-The script writes `platformSettings/global` (defaults in the architecture: Sri Lanka, LKR, English, `Asia/Colombo`, the shared category list) and an audit row. It is safe to run again.
-
-For day-to-day emulator use, the test harness and a local seed path write the same document without a cloud key. Step 6 records the exact local command in this file if it differs.
+The script writes `platformSettings/global` (defaults in the architecture: Sri Lanka, LKR, English, `Asia/Colombo`, the shared category list) and an audit row. Running it again updates that document. It does not delete other collections. Step 6 records the exact emulator command in this file if it differs.
 
 ### 8.3 Provision the first super-admin
 
-Public registration cannot create a super-admin. There is no in-app control for it either.
+Public registration cannot create a super-admin. There is no in-app control and no callable that writes `platformAdmins` or custom claims.
 
-After step 8:
-
-```bash
-GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/outside/the/repo/service-account.json \
-npm run provision:super-admin -- --project <firebase-project-id> --email <operator-email>
-```
-
-The script:
-
-1. Refuses to run if the credentials path is missing, is inside the repository, or if `--project` or `--email` is missing.
-2. Prints the project and the email and waits for a typed confirmation.
-3. Loads the Auth user. If the email does not exist, it creates the user, marks the email verified, and prints a one-time random password. The person then uses **Forgot password** on `/login` to choose their own. You may also create the email/password user yourself in the Authentication console first, and then run the script. Either path is an operator action. The `/register` page is not involved.
-4. Sets the custom claim `superAdmin: true` without removing other claims.
-5. Ensures `users/{uid}` exists, still without an admin flag on the document.
-6. Writes an audit log `super_admin.provision`.
-7. Tells the person to sign out and sign in so the ID token refreshes.
-
-Revoke:
+After step 8, against the live project only when the owner wants a real operator, and against the emulator for tests:
 
 ```bash
 GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/outside/the/repo/service-account.json \
-npm run provision:super-admin -- --project <firebase-project-id> --email <operator-email> --revoke
+npm run provision:super-admin -- --project magemai --email <operator-email>
 ```
 
-That removes the claim and writes `super_admin.revoke`. It does not delete the user.
+The script refuses to run if the credentials path is missing, is inside the repository, or if `--project` or `--email` is missing. It prints the project id, the project number, and the email. The operator types `magemai` and `122706427013`. Any other number exits before a write.
 
-Sign in at `/login` with that email. The super-admin area is `/super-admin`. A user without the claim who opens that URL sees a 403 state.
+Grant order:
+
+1. Load the Auth user by email. If the email does not exist, create it, mark the email verified, and print a one-time random password. The person uses **Forgot password** on `/login` to choose their own. Creating the user in the Authentication console first is the same kind of operator action. The `/register` page is not involved.
+2. Ensure `users/{uid}` exists, with no admin field on that document.
+3. Upsert `platformAdmins/{uid}` to `status: "active"`, with `grantedBy` set to the service-account email and `grantedAt` set to the server time. `revokedBy`, `revokedAt`, and `reason` are null. If the document is already active, leave `grantedAt` as it is.
+4. Merge the custom claim `superAdmin: true` without removing other claims.
+5. Write audit log `super_admin.provision`.
+6. Tell the person to sign out and sign in so the ID token picks up the claim. Navigation uses the claim. Lists and status changes also require the registry row from step 3.
+
+The registry is written before the claim. If the script stops after step 3, platform reads stay denied because the claim is missing. Re-run the same command. It repairs the missing half and does not duplicate the audit row when both halves are already in place. Full idempotence and partial-failure behavior is in architecture section 17.3.
+
+Revoke. `--reason` is required:
+
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/outside/the/repo/service-account.json \
+npm run provision:super-admin -- --project magemai --email <operator-email> \
+  --revoke --reason "<why this access ends>"
+```
+
+Revoke order:
+
+1. Set `platformAdmins/{uid}` to `status: "revoked"` and fill `revokedBy`, `revokedAt`, and `reason`. Keep the document. This step alone denies access, including an ID token that still contains `superAdmin: true`.
+2. Call `revokeRefreshTokens` for that uid. Refresh tokens stop working. An already issued ID token remains until it expires (at most one hour) and is denied by step 1 while it does.
+3. Remove the `superAdmin` claim, leaving any unrelated claims in place.
+4. Write audit log `super_admin.revoke` with the reason. Do not delete the Auth user.
+
+If the script stops after step 1, access is already denied. Re-run to finish the token revocation, the claim removal, and the audit row. Do not remove the claim first. An old token would keep working until expiry if the registry were still `active`.
+
+Sign in at `/login` with that email. The super-admin area is `/super-admin`. A user without the claim sees a 403 state. A user whose registry is `revoked` also sees a 403 state, even when the token still carries the claim.
 
 ## 9. Local app
 
@@ -286,31 +314,31 @@ Create businesses through that wizard. Do not add a hard-coded tenant.
 
 ## 10. Deploy
 
-Not part of normal setup. When the owner has authorized a deploy to a named environment:
+Not part of normal setup, and not part of the test commands. Deploy only after the owner has explicitly said to deploy, Blaze is on, and the budget alerts in section 7 are in place.
+
+Build first, so the bundle talks to `magemai` and not to the emulators:
 
 ```bash
-firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting --project <alias>
+npm run build -- --mode production
 ```
 
-`<alias>` is `dev`, `staging`, or `prod` from `.firebaserc`. The project must already be on Blaze, with a budget alert, before this command includes functions.
-
-Build the frontend for that environment first so the bundle contains that project's web config and does not contain the emulator flag:
+Then deploy. The command must print project id `magemai` and project number `122706427013` and wait until the operator types both. A wrapper added in the checklist does that before it invokes the CLI:
 
 ```bash
-npm run build -- --mode staging   # or production
+firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting --project magemai
 ```
 
-The exact npm script names are fixed in step 4 and recorded here if they differ.
+There is no staging project to deploy to first. This setup guide does not authorize the deploy. Do not aim a test command at `magemai`.
 
-Hosting will answer on the project's `web.app` and `firebaseapp.com` hostnames. Add those hostnames to Authentication → Authorized domains if Firebase has not added them automatically. Do not attach a custom domain in this step.
+Hosting answers on `magemai.web.app` and `magemai.firebaseapp.com`. Add those hostnames to Authentication → Authorized domains if Firebase has not added them automatically. Do not attach a custom domain.
 
 ## 11. What not to commit
 
-- `.env`, `.env.development`, `.env.staging`, `.env.production`
+- `.env`, `.env.development`, `.env.production`, and any other `.env.*` file except `.env.example`
 - Service-account JSON and any file named like a Firebase admin SDK key
 - `GOOGLE_APPLICATION_CREDENTIALS` contents
 - App Check debug tokens
-- A filled-in production hostname that has not been cleared for the brand
+- A custom domain. `magemai.web.app` and `magemai.firebaseapp.com` are the Firebase-assigned hostnames for project `magemai` and are the only hosts the docs name.
 - Emulator data exports that contain real personal information
 
 `.env.example` is the exception: names only, empty values.
@@ -323,6 +351,7 @@ Hosting will answer on the project's `web.app` and `firebaseapp.com` hostnames. 
 | The app reads a cloud project while you expected local data | `VITE_USE_FIREBASE_EMULATORS` is `true` and the dev server was restarted after the env change. |
 | Google button missing | `VITE_GOOGLE_AUTH_ENABLED=true`, then restart Vite. |
 | Onboarding returns an internal error about platform settings | Run the seed (section 8.2) against the same project the emulators or the app are using. |
-| Super-admin pages show 403 after provisioning | Sign out and sign in so the claim is on the token. Confirm the script's `--project` is the project in the env file. |
-| Functions deploy rejected | The project is still on Spark. Section 7. |
+| Super-admin pages show 403 after provisioning | Sign out and sign in so the claim is on the token. Confirm `platformAdmins/{uid}.status` is `active` and the script's `--project` was `magemai`. |
+| Super-admin nav appears and the lists return permission-denied | The token still has `superAdmin` and the registry is `revoked` or missing. That is the intended denial. Re-run the grant script only if the revocation was a mistake. |
+| Functions deploy rejected | The project is still on Spark. Section 7. `magemai` needs the Blaze upgrade the owner is applying, plus a budget alert, before a functions deploy. |
 | `firebase deploy` warns that the local Node version is not 24 | Install Node 24. The emulator warning means tests are running on a different runtime than production. |

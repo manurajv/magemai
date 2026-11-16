@@ -5,11 +5,12 @@
 **Tagline:** Your business. Your own space.  
 **Status:** Phase 1 planning. Application code is intentionally not in the repository yet.  
 **Date:** 2026-11-16  
+**Revision:** Owner review of PR #1 approved the direction and locked the four decisions in section 3. Later the same review added the `platformAdmins` registry, named `magemai` as the only cloud project, and kept local tests on the Emulator Suite.  
 **Sources:** [Product blueprint](./magemai-blueprint.md) and the product owner's development instructions.
 
 This document is the architecture contract for Phase 1. Workflow steps 4–12 in [phase-1-checklist.md](./phase-1-checklist.md) implement this contract. [setup.md](./setup.md) is the environment guide.
 
-Phase 1 follows every proposed default in [Open questions and proposed decisions](#23-open-questions-and-proposed-decisions). Override an item there before step 4, and update this document in the same change. Do not leave the code and this document in disagreement.
+Phase 1 follows every remaining proposed default in [Open questions and proposed decisions](#23-open-questions-and-proposed-decisions). OQ-1, OQ-2, OQ-20, and OQ-23 are closed. Override any other item there before step 4, and update this document in the same change. Do not leave the code and this document in disagreement.
 
 ## 1. What the repository contains today
 
@@ -39,18 +40,20 @@ The pilot business named in the blueprint is an ordinary tenant. It is created l
 | --- | --- |
 | D1 | One React web application and one Cloud Functions codebase. Feature folders own UI, schemas, and data access. Pages do not call Firestore directly. |
 | D2 | Node.js 24 for the app, the Functions runtime (`nodejs24`), and CI. Functions are 2nd generation only. The package manager is npm. |
-| D3 | Phase 1 data lives in root collections. Every tenant-owned document carries `businessId`. Future operational records live under `businesses/{businessId}/…` so the path is the tenant. |
+| D3 | **Owner-approved.** Phase 1 platform data lives in root collections. Every tenant-owned document carries `businessId`. Future operational records live under `businesses/{businessId}/…` so the path is the tenant. |
 | D4 | A membership document id is `{businessId}_{userId}`. Rules and functions load it with one `get()`. Business role is never copied into a custom claim. |
-| D5 | Platform administration is the custom claim `superAdmin: true`, set only by an operator script that uses service credentials. Registration cannot grant it. |
+| D5 | Platform administration requires both the custom claim `superAdmin: true` and an active `platformAdmins/{uid}` document. Only an operator script using the Admin SDK may write that document. The claim alone never authorizes a sensitive read. Registration cannot grant either. |
 | D6 | Client SDK reads are authorized by security rules. Privileged writes go through callable functions and the Admin SDK, then rules deny the same writes from the client. |
 | D7 | The signed-in user may update only `displayName`, `phoneNumber`, `locale`, and `updatedAt` on their own user document. Media paths are set by a function after Storage validation. |
 | D8 | The active business id in the browser is a display hint. Rules authorize the document being read. Functions load the caller's membership for the `businessId` argument and ignore any client-supplied role. |
 | D9 | Slug uniqueness is a `businessSlugs/{slug}` document created in the same transaction as the business. |
-| D10 | Instants are Firestore timestamps (UTC). Each business stores an IANA timezone. Money, when it exists, is an integer minor-unit amount plus an ISO 4217 code. Phase 1 stores the currency code and no amounts. |
+| D10 | **Owner-approved.** Instants are Firestore timestamps (UTC). Each business stores an IANA timezone. Money, when it exists, is an integer minor-unit amount plus an ISO 4217 code. Phase 1 stores the currency code and no amounts. |
 | D11 | Deployed environments that run Functions are on the Blaze plan, with a budget alert before the first deploy. Local development uses the Emulator Suite and does not need Blaze. |
-| D12 | No production hostname is configured. Hosting uses the hostnames Firebase assigns to the project. |
+| D12 | **Owner-approved.** No custom domain is configured. Hosting uses only the `web.app` and `firebaseapp.com` hostnames Firebase assigns to the project. |
+| D13 | **Owner-approved.** Firestore and Cloud Functions are located in `asia-south1` (Mumbai). |
+| D14 | One cloud Firebase project, `magemai` (number `122706427013`). Local development and automated tests use the Emulator Suite with project id `demo-magemai`. The project id is read from environment variables, so another project could be pointed at later without a code change. There is no dev, staging, or production project split. |
 
-The trade-offs behind D3–D10 are in the sections below.
+The owner locked D3, D10, D12, and D13 in the review of PR #1. Later revisions do not reopen them. `platformAdmins` is another platform root collection under D3, not a new layout. D14 is the owner's later instruction about environments. The trade-offs behind D3–D10 are in the sections below.
 
 ## 4. Target folder structure
 
@@ -102,7 +105,7 @@ magemai/
 ├── firestore.indexes.json
 ├── storage.rules
 ├── firebase.json
-├── .firebaserc                     # aliases only; real project ids filled in locally
+├── .firebaserc                     # default project id magemai; emulators pass demo-magemai explicitly
 ├── docs/
 └── README.md
 ```
@@ -161,15 +164,15 @@ Phase 1 registers the routes it actually implements.
 | `/admin` | member | Overview |
 | `/admin/profile` | member | Business profile |
 | `/admin/settings` | member | Timezone, currency, language |
-| `/super-admin` | super-admin claim | Overview with real counts |
-| `/super-admin/users` | super-admin claim | Read-only user list |
-| `/super-admin/businesses` | super-admin claim | Status and verification actions |
-| `/super-admin/verifications` | super-admin claim | Same table, verification filter |
-| `/super-admin/audit-logs` | super-admin claim | Audit list |
-| `/super-admin/categories` | super-admin claim | Coming soon |
-| `/super-admin/subscriptions` | super-admin claim | Coming soon |
-| `/super-admin/reports` | super-admin claim | Coming soon |
-| `/super-admin/settings` | super-admin claim | Coming soon |
+| `/super-admin` | Claim shows the nav. Data requires an active `platformAdmins` record. | Overview with real counts |
+| `/super-admin/users` | Same | Read-only user list |
+| `/super-admin/businesses` | Same | Status and verification actions |
+| `/super-admin/verifications` | Same | Same table, verification filter |
+| `/super-admin/audit-logs` | Same | Audit list |
+| `/super-admin/categories` | Same | Coming soon |
+| `/super-admin/subscriptions` | Same | Coming soon |
+| `/super-admin/reports` | Same | Coming soon |
+| `/super-admin/settings` | Same | Coming soon |
 
 `/register` creates a platform user. It does not create a customer record or a business. Customer account routes (`/account/…`) and public marketplace routes are added in Phase 3. `/business/register` must be declared as a static route so a later `/business/:slug` route cannot capture the word `register`.
 
@@ -209,7 +212,7 @@ Async work surfaces a loading state on the submitting control, an inline field e
 
 ## 6. Firebase architecture
 
-Three Firebase projects, one per environment: development, staging, production. Section 19 lists the configuration keys. The Emulator Suite is the default runtime for local work and CI.
+There is one cloud project, `magemai` (section 19). Local development and automated tests use the Emulator Suite and the project id `demo-magemai`. They do not connect to `magemai`. Section 19 lists the configuration keys. The keys are environment variables, so a different project id can be supplied later without changing application code.
 
 | Product | Phase 1 use |
 | --- | --- |
@@ -221,7 +224,7 @@ Three Firebase projects, one per environment: development, staging, production. 
 | App Check | Enforced in production with reCAPTCHA Enterprise |
 | Emulator Suite | Auth, Firestore, Functions, Storage, Hosting |
 
-The Functions region and the Firestore location are the same region, so callables do not pay cross-region reads. The proposed region is `asia-south1` (Mumbai). It is the open question [OQ-1](#oq-1-cloud-region) because a Firestore location cannot be changed later.
+The Functions region and the Firestore location are the same region, so callables do not pay cross-region reads. That region is `asia-south1` (Mumbai). The owner approved it (D13, [OQ-1](#oq-1-cloud-region)). A Firestore location cannot be changed later. When Firestore is enabled on `magemai`, the location must be `asia-south1`. If the database is already in another region, stop and tell the owner before writing data.
 
 Callable defaults: 256 MiB, 30 second timeout, minimum instances 0. Cold starts are acceptable in Phase 1. Raising minimum instances would bill continuously.
 
@@ -239,8 +242,8 @@ All callables require an authenticated user. Production deployments also require
 | `updateBusinessSettings` | Owner, admin | Timezone, currency, language, audit. |
 | `setBusinessImage` | Owner, admin, manager | Checks the Storage object, strips its download token, stores the path, audit. |
 | `setUserAvatar` | That user | Same pattern for `users/{uid}/avatar`. |
-| `setBusinessStatus` | Super-admin | `active` or `suspended`, audit with before and after. |
-| `setBusinessVerification` | Super-admin | Verification enum, audit with before and after. |
+| `setBusinessStatus` | Active platform admin | `active` or `suspended`, audit with before and after. The function checks the claim and `platformAdmins/{uid}.status` on every call. |
+| `setBusinessVerification` | Active platform admin | Verification enum, audit with before and after. Same claim and registry check on every call. |
 | `stripDownloadTokens` | Storage trigger | Removes `firebaseStorageDownloadTokens` from every uploaded object. |
 
 There is no callable that sets custom claims. Adding one would create a path the provisioning design exists to avoid.
@@ -286,7 +289,9 @@ emailVerified on the ID token?
                     │
                     ├─ none → /business/register
                     ├─ some → /admin with a validated active business
-                    └─ token.superAdmin == true may open /super-admin
+                    └─ token.superAdmin == true may show /super-admin
+                       Data loads only when platformAdmins/{uid}.status == active
+                       Otherwise the shell shows 403, including when the token is stale
 ```
 
 1. Email registration collects display name, email, and password. The client calls `createUserWithEmailAndPassword`, then `sendEmailVerification`.
@@ -310,11 +315,12 @@ Verification is required before onboarding and before the dashboard ([OQ-3](#oq-
 | `businessMembers/{businessId}_{userId}` | Relationship | One `get()` from rules. Queryable by user and by business. |
 | `businessSlugs/{slug}` | Uniqueness lock | The document id is the slug, which Firestore enforces as unique. |
 | `platformSettings/global` | Platform | One document. Not tenant data. |
-| `auditLogs/{auditLogId}` | Platform or one business | Super-admin queries across tenants. Business auditors query `businessId`. |
+| `platformAdmins/{uid}` | Platform | Authoritative super-admin registry. The document id is the Auth uid. |
+| `auditLogs/{auditLogId}` | Platform or one business | An active platform admin queries across tenants. Business auditors query `businessId`. |
 
 Auto-ids and Auth uids are alphanumeric, so the membership id can use a single underscore and never needs to be parsed. Code reads `businessId` and `userId` from fields.
 
-Future operational collections are subcollections of `businesses/{businessId}`. A client then cannot place a booking in business A while setting `businessId` to business B; the path is the tenant. Cross-tenant marketplace queries, when they arrive in Phase 3, use collection-group queries with rules that allow only documents marked public. That choice is [OQ-20](#oq-20-confirm-the-collection-layout).
+Future operational collections are subcollections of `businesses/{businessId}`. A client then cannot place a booking in business A while setting `businessId` to business B; the path is the tenant. Cross-tenant marketplace queries, when they arrive in Phase 3, use collection-group queries with rules that allow only documents marked public. The owner approved this layout ([OQ-20](#oq-20-confirm-the-collection-layout)). `platformAdmins` stays a root collection because it is platform data, not a tenant's operational data.
 
 Every Phase 1 timestamp field below is a Firestore `Timestamp` written with `FieldValue.serverTimestamp()` in functions, or forced equal to `request.time` when the client is the writer. Clients do not invent `createdAt`.
 
@@ -340,8 +346,8 @@ Every Phase 1 timestamp field below is a Firestore `Timestamp` written with `Fie
 
 **Security.**
 
-- `get`: the user themselves, or a super-admin.
-- `list`: super-admin only. A normal user cannot list the collection.
+- `get`: the user themselves, or an active platform admin (`isActivePlatformAdmin()` in section 15).
+- `list`: an active platform admin only. A normal user, and a revoked admin whose token still says `superAdmin`, cannot list the collection.
 - `create`: the user themselves, only when the document is missing, with `status == "active"`, email fields equal to the token, `photoPath == null`, `phoneNumber == null`, and no extra keys. This covers a delay of the Auth trigger. The trigger overwrites system fields if it runs afterwards.
 - `update`: the user themselves, and only `displayName`, `phoneNumber`, `locale`, and `updatedAt`. `email`, `emailVerified`, `photoPath`, `status`, `createdAt`, and `lastLoginAt` stay unchanged on a client update. Any unknown field rejects the write.
 - `delete`: denied.
@@ -383,8 +389,8 @@ Every Phase 1 timestamp field below is a Firestore `Timestamp` written with `Fie
 
 **Security.**
 
-- `get`: an active member of this business, or a super-admin.
-- `list`: super-admin only. A member loads their businesses by id after reading their own memberships. A collection query of `businesses` would be rejected for them, which is the intended rules behavior.
+- `get`: an active member of this business, or an active platform admin.
+- `list`: an active platform admin only. A member loads their businesses by id after reading their own memberships. A collection query of `businesses` would be rejected for them, which is the intended rules behavior.
 - `create`, `update`, `delete`: denied to every client, including a super-admin using the client SDK.
 
 Suspended businesses remain readable by their members so the shell can explain the suspension. Functions reject profile and settings updates while `status != "active"`.
@@ -410,10 +416,10 @@ One document per person per business. The id format makes a duplicate membership
 
 **Security.**
 
-- `get`: the member themselves, a super-admin, or an active owner/admin/manager of the same business (staff directory read).
+- `get`: the member themselves, an active platform admin, or an active owner/admin/manager of the same business (staff directory read).
 - `list`: three shapes, because rules are not filters. A query is allowed only when its constraints match a rule.
   - `where("userId", "==", caller)` for the caller's own memberships.
-  - super-admin, unconstrained.
+  - an active platform admin, unconstrained.
   - `where("businessId", "==", id)` when the caller is an active owner, admin, or manager of `id`.
 - If emulator tests show that the third shape is rejected because the rule's `get()` depends on `resource.data.businessId`, Phase 1 adds a `listBusinessMembers` callable instead of weakening the rule. The cross-tenant tests stay either way.
 - `create`, `update`, `delete`: denied to every client.
@@ -465,11 +471,36 @@ Seed categories (ids): `photography`, `videography`, `drone`, `events`, `beauty`
 **Security.**
 
 - `get` of `global`: any signed-in user. Onboarding needs the category, currency, and language lists.
-- `get` of any other id: super-admin only, so a future private settings document is not readable by every user.
-- `list`: super-admin only.
+- `get` of any other id: an active platform admin only, so a future private settings document is not readable by every user.
+- `list`: an active platform admin only.
 - client writes: denied.
 
-### 8.7 `auditLogs/{auditLogId}`
+### 8.7 `platformAdmins/{uid}`
+
+The document id is the Firebase Auth uid. This collection is the authoritative record of who may administer the platform. The custom claim `superAdmin: true` is a navigation hint. A sensitive read or a privileged callable also requires this document to exist and to say `status == "active"`.
+
+| Field | Type | Writer | Notes |
+| --- | --- | --- | --- |
+| `id` | string | Admin SDK | Same as the document id and the Auth uid. |
+| `status` | `"active"` or `"revoked"` | Admin SDK | Any other value, and a missing document, deny platform access. |
+| `grantedBy` | string | Admin SDK | Email of the service account that granted or re-granted. |
+| `grantedAt` | timestamp | Admin SDK | Server time of the grant or of the latest re-grant. |
+| `revokedBy` | string or null | Admin SDK | Null while `active`. Service-account email once revoked. |
+| `revokedAt` | timestamp or null | Admin SDK | Null while `active`. |
+| `reason` | string or null | Admin SDK | Null while `active`. Required when `status` is `revoked`. |
+
+A re-grant sets `status` back to `active`, writes new `grantedBy` and `grantedAt`, and clears `revokedBy`, `revokedAt`, and `reason`. The earlier revocation stays in `auditLogs`. The script does not delete the document.
+
+**Ownership.** The platform owns the document. The person it names cannot edit it.
+
+**Security.**
+
+- Client create, update, and delete are denied for every caller, including an active platform admin using the client SDK and including a super-admin custom claim.
+- Client `get`: a signed-in user may read their own document, so the shell can show a 403 when the registry is revoked while the ID token still carries `superAdmin`. An active platform admin may read any document in the collection.
+- Client `list`: an active platform admin only.
+- Security-rule `exists()` and `get()` inside `isActivePlatformAdmin()` read this document even when a client read of someone else's document would be denied. That is what rejects a stale token.
+
+### 8.8 `auditLogs/{auditLogId}`
 
 Append-only. The document id is an auto-id. Phase 1 writes an audit row in the same transaction as the change it describes, except the storage-token trigger, which does not audit ordinary uploads (the image callable writes the audit).
 
@@ -499,8 +530,8 @@ Phase 1 action catalog:
 | `business.status.update` | Suspend or reactivate |
 | `business.verification.update` | Verification change |
 | `platform_settings.seed` | Seed script |
-| `super_admin.provision` | Claim granted |
-| `super_admin.revoke` | Claim removed |
+| `super_admin.provision` | Registry set to `active` and the claim set. Metadata records `grantedBy`. A re-grant sets `metadata.regrant` true. |
+| `super_admin.revoke` | Registry set to `revoked`, refresh tokens revoked, then the claim removed. Metadata records `reason`, `revokedBy`. |
 
 Self-service edits to display name, phone, and locale are not audit events in Phase 1 ([OQ-15](#oq-15-what-is-audited)).
 
@@ -509,12 +540,12 @@ Self-service edits to display name, phone, and locale are not audit events in Ph
 **Security.**
 
 - Client create, update, and delete: denied, including for super-admins using the client SDK.
-- `get` and `list`: a super-admin may read every log.
+- `get` and `list`: an active platform admin may read every log. A token that still contains `superAdmin` while the registry is `revoked` cannot.
 - A business owner or admin may read a log only when `scope == "business"` and `businessId` is a business they actively administer. The query must filter on both fields.
 - Managers, staff, and non-members cannot read audit logs.
 - The Admin SDK bypasses these rules. No function or script deletes logs. Retention is indefinite in Phase 1 ([OQ-16](#oq-16-audit-retention)).
 
-### 8.8 Future collections (relationships only)
+### 8.9 Future collections (relationships only)
 
 These are not created in Phase 1. No security rules, indexes, or screen should reference them yet. When a later phase adds one, it gets a field-level spec and rules tests in that phase.
 
@@ -578,7 +609,7 @@ Permissions are explicit strings in `shared/permissions`. Roles map to permissio
 | `platform.audit.read` | yes |
 | `platform.settings.read` | yes |
 
-Super-admin is not a business role and is not stored on `businessMembers`. Holding it does not write an owner membership. It does not grant Storage reads.
+Super-admin is not a business role and is not stored on `businessMembers` or on `users`. The permission is granted only when `platformAdmins/{uid}.status` is `active` and the ID token carries `superAdmin: true`. The registry is the half that can be revoked immediately. The claim is the half the shell uses to show navigation. Holding either one does not write an owner membership and does not grant Storage reads.
 
 ### 10.2 Business
 
@@ -603,24 +634,25 @@ UI, functions, and rules share this matrix. The functions import the TypeScript 
 
 Group owner, group admin, and group member are Phase 5. They are not Phase 1 roles and they never imply a business role.
 
-## 11. Custom claims and membership documents
+## 11. Custom claims, the admin registry, and membership documents
 
-The two mechanisms answer different questions.
+Three mechanisms answer three questions. Sensitive platform access uses the first two together. Business access uses the third.
 
-| | Custom claim `superAdmin` | Membership document |
-| --- | --- | --- |
-| Question it answers | Is this person a platform operator? | What may this person do at this business? |
-| Visible to rules | `request.auth.token.superAdmin == true`, no document read | `get()` of `businessMembers/{businessId}_{uid}` |
-| Freshness | Stale until the ID token refreshes, up to an hour | The next request sees a revocation |
-| Size | Well under the 1000-byte claim limit | One small document per business |
-| Who can set it | Admin SDK in the operator script | Admin SDK inside `createBusiness` |
-| Fits many businesses | No. A user can belong to more businesses than a token should list. | Yes |
+| | Custom claim `superAdmin` | `platformAdmins/{uid}` | Membership document |
+| --- | --- | --- | --- |
+| Question it answers | Should the shell show platform navigation? | Is this person an active platform admin right now? | What may this person do at this business? |
+| Where it is checked | The React route guard only | Rules, via `isActivePlatformAdmin()`, and every privileged callable | Rules and business callables |
+| Freshness | Stale until the ID token refreshes, up to one hour | The next request sees `revoked` | The next request sees a revocation |
+| Who can set it | Admin SDK in the operator script | Admin SDK in the same script | Admin SDK inside `createBusiness` |
+| Sufficient on its own for a platform read | No | No. The rule also requires the claim. | Not a platform grant |
 
-Business id, business role, and permission lists are not written into the token. Putting them there would let a removed member keep access until refresh, and it would hit the size limit for people who work with many businesses.
+Business id, business role, and permission lists are not written into the token. A token cannot list every business a person may join, and a removed member would keep that copy until refresh.
 
-The claim is not mirrored onto the user document. A boolean on the user document would invite a future rule to trust a field the client might try to write. The admin UI decides whether to show super-admin navigation from `getIdTokenResult().claims.superAdmin`. That check is cosmetic. `setBusinessStatus` and `setBusinessVerification` verify the claim with the Admin SDK (`getUser`, then the custom claims) on every call.
+The claim is not copied onto the user document. A boolean there would invite a later rule to trust a field a client might try to write. `platformAdmins` is a separate collection with client writes denied, which is why the registry can be the authorization record and the user profile cannot.
 
-After the provisioning script sets or clears the claim, the person signs out and signs in. `onIdTokenChanged` then sees the new token.
+The admin UI shows super-admin navigation from `getIdTokenResult().claims.superAdmin`. That check is cosmetic. If the registry is `revoked`, the platform queries fail and the shell renders the 403 state even though the nav was offered. `setBusinessStatus` and `setBusinessVerification` call `assertActivePlatformAdmin` on every invocation: the Admin SDK reads the Auth user and requires `customClaims.superAdmin == true`, then reads `platformAdmins/{uid}` and requires `status == "active"`. Either miss returns `permission-denied`. The function does not cache that result across calls.
+
+`revokeRefreshTokens` runs during revocation so the client cannot mint a new ID token from its refresh token. An ID token that was already issued stays valid until it expires, which is at most one hour. The registry check is what denies that token. Removing the claim without first revoking the registry would leave the old token authorized. The script therefore writes `status: "revoked"` before it touches tokens or claims (section 17.3).
 
 ## 12. Active business context
 
@@ -637,7 +669,9 @@ The browser holds `activeBusinessId` so the shell knows which name to show. Auth
 5. Ignores any `role`, `ownerId`, `status`, or `verificationStatus` in the payload.
 6. Writes the change and the audit row in one transaction.
 
-A caller who is an owner of business A and passes business B's id is rejected at step 2. Tests XT-1 through XT-20 in section 20 exercise that case.
+A caller who is an owner of business A and passes business B's id is rejected at step 2. Tests XT-1 through XT-25 in section 20 exercise tenant isolation and platform-admin revocation.
+
+Privileged platform callables run `assertActivePlatformAdmin` before the membership checks above, and they do not consult a membership at all. A stale `superAdmin` claim with a revoked registry fails that helper.
 
 Switching businesses never writes a membership and never changes a claim.
 
@@ -671,7 +705,7 @@ The server validates timezones with `Intl.supportedValuesOf("timeZone")` on Node
 - The exponent comes from ISO 4217. LKR, USD, EUR, GBP, INR, AUD, CAD, and SGD use exponent 2. A later currency with exponent 0 or 3 uses that currency's exponent. The code must not assume 2 for every code.
 - `1_500_000` minor units of LKR display as LKR 15,000.00.
 - Formatting uses `Intl.NumberFormat`. Arithmetic stays on integers.
-- The blueprint's illustration (amount `15000` displayed as LKR 15,000.00) does not name its unit. [OQ-2](#oq-2-money-units) records that conflict. The plan follows integer minor units, which both the blueprint's data principle and the owner's instructions require.
+- The blueprint's illustration (amount `15000` displayed as LKR 15,000.00) does not name its unit. [OQ-2](#oq-2-money-units) records that conflict. The owner approved integer minor units. Phase 1 stores no amounts. The field name will be `amountMinor` when money arrives.
 
 Historical payment and invoice rows, when they exist, are append-only and keep their own currency and amount. Changing a business's default currency later does not rewrite them.
 
@@ -682,24 +716,40 @@ Rules are default-deny, version 2. A missing match denies. `if false` does not o
 Helpers:
 
 - `isSignedIn()` — `request.auth != null`
-- `isSuperAdmin()` — `isSignedIn() && request.auth.token.superAdmin == true`
+- `platformAdminPath()` — `/databases/$(database)/documents/platformAdmins/$(request.auth.uid)`
+- `isActivePlatformAdmin()` — the platform-read gate. The claim is required and is not sufficient:
+
+```text
+function isActivePlatformAdmin() {
+  return isSignedIn()
+    && request.auth.token.superAdmin == true
+    && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid))
+    && get(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)).data.status == 'active';
+}
+```
+
+`&&` stops at the first false term, so a missing claim does not read the registry, and a missing document does not read `.data`. `exists` before `get` keeps a missing document from failing the whole rules expression. A document whose `status` is `revoked` makes the function false while `request.auth.token.superAdmin` is still true. That is the stale-token case (XT-24).
+
+No `allow` rule may treat `request.auth.token.superAdmin == true` as enough on its own. There is no helper named for the claim alone, so a later edit cannot call one by mistake.
+
 - `membershipPath(businessId)` — `/databases/$(database)/documents/businessMembers/$(businessId + '_' + request.auth.uid)`
 - `membershipExists(businessId)` — `exists()` before any `get()`, so a missing membership denies that clause instead of erroring the whole expression
 - `membership(businessId)` — `get()` after `exists()`
 - `isActiveMember(businessId)` — exists, `status == "active"`
 - `roleIs(businessId, roles)` — active member whose `role` is in the list
 
-`get()` calls per request stay at one membership document (plus `exists` on the same path). Rules do not loop and do not scan a collection.
+A member allow touches the membership document (`exists` plus `get`). A platform allow touches `platformAdmins/{uid}` the same way. An allow that ORs the two can touch both, which stays inside the ten-document access limit. Rules do not loop and do not scan a collection.
 
 | Path | Client read | Client write |
 | --- | --- | --- |
-| `users/{uid}` | Self `get`, or super-admin `get`/`list` | Self create under the strict shape in 8.2. Self update of the allow-list. |
-| `businesses/{id}` | Active member `get`, or super-admin `get`/`list` | Denied |
+| `users/{uid}` | Self `get`, or active platform admin `get`/`list` | Self create under the strict shape in 8.2. Self update of the allow-list. |
+| `businesses/{id}` | Active member `get`, or active platform admin `get`/`list` | Denied |
 | `businessMembers/{id}` | The shapes in 8.4 | Denied |
 | `businessSlugs/{slug}` | Denied | Denied |
 | `platformSettings/global` | Any signed-in `get` | Denied |
-| `platformSettings/{other}` | Super-admin | Denied |
-| `auditLogs/{id}` | Super-admin, or owner/admin of that business for `scope == "business"` | Denied |
+| `platformSettings/{other}` | Active platform admin | Denied |
+| `platformAdmins/{uid}` | Own `get` if signed in. Any `get`, and `list`, if an active platform admin. | Denied |
+| `auditLogs/{id}` | Active platform admin, or owner/admin of that business for `scope == "business"` | Denied |
 | anything else | Denied | Denied |
 
 Rules do not grant access because an id is hard to guess. They do not read a role from the request body. They do not treat `ownerId` on the business as proof of ownership.
@@ -782,37 +832,81 @@ Every status and verification change writes `business.status.update` or `busines
 
 - The registration form, including extra JSON fields.
 - Google sign-in.
-- A write to `users/{uid}` or `businessMembers`.
+- A write to `users/{uid}`, `businessMembers`, or `platformAdmins` from the client SDK. Rules deny every client write to `platformAdmins`.
 - A callable, including one restricted to existing super-admins.
 - Owning a business.
-- The Firebase console's Firestore data editor. Claims are not a Firestore field. Editing a document cannot grant the claim, and there is no document field that rules accept as a substitute.
+- Setting the custom claim without an active registry document, or writing the registry without the claim. Platform reads require both.
+- Hand-editing `platformAdmins` in the Firebase console. The console uses credentials that bypass rules, so a console write can change the document, and it will not set the claim or write the audit row. That is not the supported procedure. The supported procedure is the script below, which keeps the registry, the claim, and the audit row together.
 
-### 17.3 Initial provisioning
+### 17.3 Provisioning and revocation
 
-The only supported grant is `scripts/provision-super-admin.ts`, run by an operator with service credentials. Step 8 implements the script. The contract:
+The only supported grant and revoke path is `scripts/provision-super-admin.ts`, run by an operator with service credentials. Step 8 implements the script. There is no in-app control and no callable.
 
 ```text
 GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/outside/the/repo/service-account.json \
 npm run provision:super-admin -- --project <firebase-project-id> --email <email>
 ```
 
-The script:
+Revoke, with a reason:
 
-1. Refuses to start unless `GOOGLE_APPLICATION_CREDENTIALS` points at a file outside the repository and `--project` and `--email` are present.
-2. Prints the project id and email, and requires a typed confirmation.
-3. Loads the Auth user by email. If there is no such user, it creates one with a randomly generated password that it prints once, and sets `emailVerified` true. The person then uses password reset to choose a password. The script can also be pointed at an account the operator already created in the Firebase console. Either way, the public registration form is not the grant.
-4. Reads existing custom claims, merges `superAdmin: true` without dropping unrelated claims, and calls `setCustomUserClaims`.
-5. Creates or updates `users/{uid}` system fields through the Admin SDK. It still does not add an admin boolean to the document.
-6. Writes an audit row `super_admin.provision` with `scope: "platform"`, `actorType: "system"`, and the operator identity in `metadata.operator` taken from the service-account email.
-7. Prints that the person must sign out and sign in.
+```text
+GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/outside/the/repo/service-account.json \
+npm run provision:super-admin -- --project <firebase-project-id> --email <email> \
+  --revoke --reason "<why this access ends>"
+```
 
-Revocation is the same script with `--revoke`. It removes the `superAdmin` key, writes `super_admin.revoke`, and does not delete the user.
+The script refuses to start unless `GOOGLE_APPLICATION_CREDENTIALS` points at a file outside the repository and `--project` and `--email` are present. `--revoke` also requires a non-empty `--reason`. It prints the project id, the project number, and the email. The operator must type the project id and the project number. For `magemai` the number has to be `122706427013`. A mismatch exits without writing. `grantedBy` and `revokedBy` are the service-account email.
 
-The service account needs Firebase Authentication Admin and Cloud Datastore User on that one project. Development, staging, and production each have their own service account and their own super-admin. A claim in one project is not a claim in another.
+#### Grant order
+
+1. Load the Auth user by email. If there is no such user, create one with a randomly generated password that is printed once, and set `emailVerified` true. The person then uses password reset to choose a password. The operator may instead create the user in the Authentication console first and then run the script. The public registration form is not involved.
+2. Create or update `users/{uid}` system fields through the Admin SDK. Do not add an admin field to that document.
+3. Upsert `platformAdmins/{uid}` to `status: "active"`. On a first grant, set `grantedBy`, `grantedAt`, and leave `revokedBy`, `revokedAt`, and `reason` null. On a re-grant of a revoked document, set a new `grantedBy` and `grantedAt` and clear the three revocation fields. If the document is already `active`, leave `grantedAt` unchanged.
+4. Read existing custom claims, merge `superAdmin: true` without dropping unrelated claims, and call `setCustomUserClaims`.
+5. Write an audit row `super_admin.provision` with `scope: "platform"`, `actorType: "system"`, and `metadata.operator` set to the service-account email. A re-grant also sets `metadata.regrant` true.
+6. Print that the person must sign out and sign in.
+
+The registry is written before the claim. If the process stops between steps 3 and 4, the document is `active` and the claim is absent. Rules require both, so platform reads stay denied, and the shell has no claim to show. Re-running the script sets the claim.
+
+#### Revoke order
+
+Revocation writes the registry first. That is the step that denies an ID token which still contains `superAdmin: true`.
+
+1. Upsert `platformAdmins/{uid}` to `status: "revoked"`, set `revokedBy` and `revokedAt`, and store `reason`. If no document exists, create it already revoked so a claim-only account is recorded and denied. Do not delete the document. If it is already `revoked`, do not change `revokedAt` or `reason`.
+2. Call `revokeRefreshTokens(uid)`. This invalidates refresh tokens. An ID token that was already issued remains valid until its `exp`, at most one hour. The registry from step 1 denies that token anyway.
+3. Remove the `superAdmin` key with `setCustomUserClaims`, preserving any unrelated claims.
+4. Write an audit row `super_admin.revoke` with the reason and the service-account email. Do not delete the user.
+
+Doing step 3 before step 1 would be unsafe: the old ID token would still carry the claim, the registry would still be `active`, and platform reads would still succeed until the token expired.
+
+#### Idempotence
+
+| Starting state | Grant | Revoke |
+| --- | --- | --- |
+| No user | Create the user, then grant | Exit 0. There is nothing to revoke. |
+| User, no registry, no claim | Write an active registry, set the claim, audit | Write a revoked registry, clear a claim that is already absent, revoke refresh tokens, audit |
+| Registry `active`, claim set | Exit 0. Do not change `grantedAt`. Do not write a second audit. | Revoke as above |
+| Registry `revoked`, claim absent | Re-grant as above, with a new `grantedAt` and one audit row | Exit 0. Call `revokeRefreshTokens` again (it is safe). Do not change `revokedAt`. Do not write a second audit. |
+| Registry and claim disagree | Repair to active registry plus claim, one audit row | Repair to revoked registry, no claim, refresh tokens revoked, one audit row |
+
+#### Partial failure
+
+The script stops at the first error, exits non-zero, and prints the last step that succeeded. Re-running the same command resumes from the stored state.
+
+| Stopped after | Registry | Claim | Platform read with the current token | What the re-run does |
+| --- | --- | --- | --- | --- |
+| Grant step 3, step 4 failed | `active` | absent | Denied. Both are required. | Sets the claim and writes the audit |
+| Grant step 4, step 5 failed | `active` | present | Allowed | Writes the missing audit row |
+| Revoke step 1, step 2 failed | `revoked` | still present | Denied, including an old token that still has the claim | Revokes refresh tokens, removes the claim, writes the audit |
+| Revoke step 2 or 3, audit failed | `revoked` | removed | Denied | Writes the missing audit row |
+
+A partial grant cannot open platform reads. A partial revoke cannot leave them open.
+
+The service account needs Firebase Authentication Admin and Cloud Datastore User on `magemai` only. A claim or a `platformAdmins` document exists in that project alone. The script prints project id `magemai` and project number `122706427013` and requires the operator to type both before it writes. It refuses to run when `--project` is `magemai` and the typed number is anything else.
 
 Credentials live outside the repo. `.gitignore` rejects `.env` files and service-account JSON. The frontend has no Admin SDK dependency and no code path that accepts a service account.
 
-A second operator is provisioned by running the script again. Existing super-admins cannot mint further super-admins from the UI.
+A second operator is provisioned by running the script again. Existing super-admins cannot mint or revoke further super-admins from the UI.
 
 ## 18. Onboarding wizard
 
@@ -834,23 +928,48 @@ On success the stored business has `status: "active"`, `verificationStatus: "unv
 
 ## 19. Environment configuration
 
-| Environment | Firebase project | Where it runs |
+The owner will not create separate development or staging Firebase projects. `magemai` is the only cloud project. Every real deploy, operator script, and hosted site uses it. Local development and automated tests use the Emulator Suite and never that project.
+
+| | Value |
+| --- | --- |
+| Cloud project id | `magemai` |
+| Project number | `122706427013` |
+| Support email | `mavixas.ceo@gmail.com` |
+| Billing | The owner is upgrading this project to Blaze. Budget alerts are required before the first functions deploy (section 22). |
+| Firestore and Functions region | `asia-south1` (D13) |
+| Assigned hostnames | `magemai.web.app` and `magemai.firebaseapp.com` |
+| Local and CI project id | `demo-magemai` (emulators only) |
+
+Those two hostnames are the ones Firebase assigns to project id `magemai`. They are not a custom domain. D12 still forbids any other hostname. The public web config (API key, app id, and the rest of the `VITE_FIREBASE_*` values) is not in the repository. It is added later in a gitignored env file.
+
+| Work | Project | Rule |
 | --- | --- | --- |
-| Local | Emulator project `demo-magemai`, or the dev project id when exercising deployed dev | Developer machine and CI |
-| Development | A Firebase project the owner creates | Optional cloud deploy for shared testing |
-| Staging | A second project | Cloud, Blaze, before a production promotion |
-| Production | A third project | Cloud, Blaze, only after an explicit decision to deploy |
+| `npm run dev`, unit tests, rules tests, Playwright, CI | `demo-magemai` on the Emulator Suite | The default. No cloud credentials. |
+| An explicit build or deploy, seed, or super-admin script | `magemai` | Only after the confirmation in the safeguards below. |
 
-Suggested project ids (`magemai-dev`, `magemai-staging`, `magemai-prod`) are examples. The real ids are chosen in the Firebase console and written into gitignored env files and into `.firebaserc` aliases `dev`, `staging`, and `prod`. This repository does not invent a production domain. The hostname shown in the blueprint's public-profile example is an illustration, not an authorized domain and not a value to copy into config. Authorized Auth domains are `localhost`, `127.0.0.1`, and the `web.app` and `firebaseapp.com` hostnames of the project that was actually created.
+`.firebaserc` sets `default` to `magemai` so a deliberate deploy has one target. Emulator commands pass `--project demo-magemai` and do not rely on that default. There are no `dev`, `staging`, or `prod` project aliases.
 
-Vite modes:
+Authorized Auth domains for `magemai` are `localhost`, `127.0.0.1`, `magemai.web.app`, and `magemai.firebaseapp.com`. The OAuth consent screen support email is `mavixas.ceo@gmail.com`. No custom domain is added.
 
-| File | Mode | Committed |
-| --- | --- | --- |
-| `.env.example` | documentation of names | yes, values empty |
-| `.env.development` | `vite` / local emulators | no |
-| `.env.staging` | `vite build --mode staging` | no |
-| `.env.production` | `vite build` | no |
+### Safeguards for the single live project
+
+`magemai` holds real data once anyone uses the hosted app. These safeguards are part of the implementation, not optional hygiene:
+
+1. **Emulators by default.** `.env.development` sets `VITE_USE_FIREBASE_EMULATORS=true` and `VITE_FIREBASE_PROJECT_ID=demo-magemai`. The dev server and every test command use the emulators. A production build throws on startup if the emulator flag is `true`, so a local flag cannot silently ship.
+2. **Tests cannot target the live project.** `npm test`, `npm run test:rules`, `npm run test:e2e`, and `npm run test:all` pass `--project demo-magemai`. They do not load `GOOGLE_APPLICATION_CREDENTIALS`. A test that sees project id `magemai` fails before it connects.
+3. **No destructive scripts against `magemai`.** No script deletes collections, clears Auth users, imports emulator data, or overwrites the database. If a maintenance script of that kind is added later, it must refuse `--project magemai` outright. Seed and super-admin provisioning are intentional writes, not wipes, and they still require the confirmation below.
+4. **Explicit confirmation before any deploy or live write.** The deploy command and the operator scripts print project id `magemai` and project number `122706427013` and wait until the operator types both. A mismatch exits without calling Firebase. This document does not authorize a deploy.
+5. **Budget alerts before the first functions deploy.** Section 22. The owner is upgrading `magemai` to Blaze. Minimum instances stay at 0.
+
+### Environment variables
+
+Vite modes stay in env files so the project id is data, not a constant in source. Another project can be introduced later by adding a gitignored env file and pointing these variables at it. Application code keeps reading the variables. No second project is part of the current plan.
+
+| File | Mode | Committed | Points at |
+| --- | --- | --- | --- |
+| `.env.example` | names only | yes, values empty | — |
+| `.env.development` | `vite` / local | no | emulators, `demo-magemai` |
+| `.env.production` | `vite build` | no | `magemai`, emulators off |
 
 Variable names. These are the Firebase *web* config values, which ship in the browser bundle. They are not service credentials. The service account is not one of them.
 
@@ -869,7 +988,7 @@ VITE_FIREBASE_EMULATOR_HOST
 
 `VITE_USE_FIREBASE_EMULATORS` is `true` only in `.env.development`. The client throws on startup if a production build sees that flag set to `true`. `VITE_GOOGLE_AUTH_ENABLED` is `true` only after Google provider is configured for that project; the login screen hides the Google button otherwise, and tests that need a real Google account are reported as not run.
 
-`VITE_FIREBASE_APP_CHECK_SITE_KEY` is empty locally. Production and staging builds set the reCAPTCHA Enterprise site key. The matching secret stays in App Check / Cloud, not in the frontend env file.
+`VITE_FIREBASE_APP_CHECK_SITE_KEY` is empty locally. A build aimed at `magemai` sets the reCAPTCHA Enterprise site key. The matching secret stays in App Check / Cloud, not in the frontend env file.
 
 Operator-only, never prefixed with `VITE_`, never committed:
 
@@ -903,6 +1022,7 @@ Pure logic, no emulator:
 - Dashboard nav renders Coming soon entries as disabled.
 - Route guard sends an anonymous user toward login and does not render the dashboard.
 - Super-admin nav is absent when the claim is missing, and a direct guard renders the 403 state.
+- When the claim is present and the registry read returns `revoked`, the guard renders the 403 state and does not render platform lists.
 
 ### 20.3 Playwright
 
@@ -914,7 +1034,8 @@ Runs against the Emulator Suite in two projects: a desktop Chromium viewport (12
 - Sign out, open `/admin` while signed out, land on `/login`.
 - Password reset completes using the emulator's out-of-band code.
 - A normal user who opens `/super-admin` sees the 403 state.
-- A user provisioned with the claim in the emulator sees the user list and the business list.
+- A user provisioned in the emulator with the claim and an active `platformAdmins` document sees the user list and the business list.
+- A user whose registry is `revoked`, with a test token that still has `superAdmin: true`, does not see those lists.
 - Suspend that business as super-admin, sign back in as the owner, see the suspended banner, and confirm the profile form is not editable.
 - The audit list shows the suspension.
 
@@ -928,7 +1049,8 @@ Google sign-in in Playwright uses the Auth emulator's simulated Google provider.
 - User B, owner of business B.
 - User S, staff of business A (membership written with the Admin SDK).
 - User P, no memberships, no claim.
-- User SA, custom claim `superAdmin: true`, no membership.
+- User SA, custom claim `superAdmin: true`, `platformAdmins/SA` with `status: "active"`, no membership.
+- User SR, custom claim `superAdmin: true`, `platformAdmins/SR` with `status: "revoked"`, no membership. SR is the stale-token principal: the claim is still on the token.
 
 | ID | Attempt | Expected |
 | --- | --- | --- |
@@ -945,17 +1067,24 @@ Google sign-in in Playwright uses the Auth emulator's simulated Google provider.
 | XT-11 | A calls `setBusinessStatus` | `permission-denied` |
 | XT-12 | S reads A's audit logs | deny |
 | XT-13 | A reads A's business audit logs, and A reads a platform audit log | allow, then deny |
-| XT-14 | SA reads business A, business B, users, and platform audit logs | allow |
-| XT-15 | SA writes an audit log, a business, or a membership from the client SDK | deny |
-| XT-16 | Signed-out reads of users, businesses, memberships, settings, audit logs, and brand objects | deny |
+| XT-14 | SA, with an active registry, reads business A, business B, users, and platform audit logs | allow |
+| XT-15 | SA writes an audit log, a business, a membership, or a `platformAdmins` document from the client SDK | deny |
+| XT-16 | Signed-out reads of users, businesses, memberships, settings, `platformAdmins`, audit logs, and brand objects | deny |
 | XT-17 | A uploads SVG, HEIC, or a 3 MiB logo to A's brand path | deny |
 | XT-18 | A reads or writes `businesses/A/private/secret` | deny |
 | XT-19 | After ordinary registration, A's token has no `superAdmin` claim | assert |
 | XT-20 | `createBusiness` with a payload that sets `role: "staff"`, `status: "suspended"`, and `verificationStatus: "verified"` | stored role is `owner`, status is `active`, verification is `unverified` |
+| XT-21 | SA (claim true, `platformAdmins` status `active`) reads users, businesses, and platform audit logs, and `setBusinessStatus` is authorized | allow |
+| XT-22 | P, with no claim and no registry document, reads those platform collections or SA's `platformAdmins` document | deny |
+| XT-23 | A principal whose registry is `revoked` and whose token has no `superAdmin` claim reads those platform collections or calls `setBusinessStatus` | deny |
+| XT-24 | SR (registry `revoked`, ID token still has `superAdmin: true`) reads those platform collections or calls `setBusinessStatus` | deny |
+| XT-25 | P creates or updates `platformAdmins/{any uid}` from the client SDK. The same test asserts SA's client SDK write is denied too | deny |
+
+XT-21 is the positive registry case. XT-14 stays as the cross-tenant read by that same active admin. XT-24 is the revocation property: access ends when the registry says `revoked`, without waiting for the ID token to expire.
 
 Positive cases sit next to these: A can `get` business A, A can list A's memberships, A can upload a small PNG logo, SA can suspend B and the audit row exists, and a staff member can `get` the business but cannot call `updateBusinessSettings`.
 
-CI, added in step 10, runs `firebase emulators:exec` so a green test run includes XT-1 through XT-20. Unit tests and Playwright run inside that wrapper or immediately after it in the same job. The job does not receive service-account credentials.
+CI, added in step 10, runs `firebase emulators:exec` so a green test run includes XT-1 through XT-25. The job uses `demo-magemai` and does not receive service-account credentials for `magemai`. Unit tests and Playwright run inside that wrapper or immediately after it in the same job.
 
 ### 20.5 Commands the foundation will wire
 
@@ -970,21 +1099,22 @@ These scripts do not exist until step 4 and step 9. This planning pass does not 
 
 ## 21. Deployment strategy
 
-Order, per project:
+There is one deploy target: project `magemai`, region `asia-south1`. Nothing in Phase 1 deploys unless the owner explicitly says to deploy, and the command then requires the typed confirmation in section 19.
 
-1. Confirm the Firestore location and the Functions region before the first write.
-2. Confirm Blaze and a budget alert (section 22) before the first functions deploy.
-3. `firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting --project <alias>`.
+1. Confirm Firestore on `magemai` is in `asia-south1`, and deploy Functions to that same region, before the first write.
+2. Confirm Blaze and the budget alerts in section 22 before the first functions deploy. The owner is upgrading `magemai` to Blaze. This document does not authorize that deploy.
+3. Build with `--mode production` so `VITE_USE_FIREBASE_EMULATORS` is false and `VITE_FIREBASE_PROJECT_ID` is `magemai`.
+4. Run `firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting --project magemai` only after the operator types project id `magemai` and project number `122706427013`.
 
-Hosting is a single-page app. `index.html` is not cached for long; hashed assets are. All routes rewrite to `index.html`. The production build must have `VITE_USE_FIREBASE_EMULATORS` unset or `false`.
+Hosting is a single-page app. `index.html` is not cached for long; hashed assets are. All routes rewrite to `index.html`. The live build must have `VITE_USE_FIREBASE_EMULATORS` unset or `false`.
 
-Promotion path: emulator CI green, then an explicit deploy to development or staging, then a manual pass of the checklist on that project, then production. Production is not deployed as part of Phase 1 implementation unless the owner explicitly authorizes that deploy. Staging is the same: the checklist prepares the project, and a person decides when to deploy.
+The path to a live deploy is: emulator CI green, then the owner's explicit decision, then the typed confirmation, then the deploy command. There is no staging project in between. A mistake lands in the only cloud project, which is why the confirmation names both the id and the number.
 
 No custom domain, no preview-channel requirement, and no server-side rendering in Phase 1. Public pages in Phase 3 are still a client-rendered SPA until a separate decision to prerender. That decision happens before a large marketplace launch, not during Phase 1.
 
-Scheduled Firestore exports to Cloud Storage are the backup story. They require Blaze and a bucket, and they should be turned on before production holds real tenant data. They are an operations task on the production project, not a Phase 1 feature.
+Scheduled Firestore exports to Cloud Storage are the backup story. They require Blaze and a bucket, and they should be turned on before `magemai` holds real tenant data. They are an operations task, not a Phase 1 feature.
 
-Auth settings to apply on each cloud project: email/password enabled, Google enabled when the OAuth client exists, email enumeration protection on, authorized domains limited to localhost and that project's Firebase hostnames.
+Auth settings on `magemai`: email/password enabled, Google enabled when the OAuth client exists, email enumeration protection on, authorized domains limited to localhost and `magemai.web.app` / `magemai.firebaseapp.com`.
 
 ## 22. Firebase billing
 
@@ -996,7 +1126,7 @@ Auth settings to apply on each cloud project: email/password enabled, Google ena
 - Security rules.
 - The Emulator Suite, including running Functions locally. Emulators do not bill.
 
-Phone authentication is not used. Spark is enough to create the projects and to develop against emulators.
+Phone authentication is not used. Spark is enough for the Emulator Suite. `magemai` is moving to Blaze because it will host Cloud Functions.
 
 ### 22.2 What needs Blaze
 
@@ -1004,39 +1134,37 @@ Cloud Functions for Firebase, 1st and 2nd gen, deploy only from a Blaze project.
 
 Blaze includes a no-cost monthly allowance for function invocations, compute, and egress. Container storage and the builds that publish functions can still produce small charges inside that allowance, so a Blaze project is not a promise of a zero invoice. Firestore, Storage, and Hosting on Blaze keep a no-cost allowance and then bill for additional use.
 
-Each of development, staging, and production that will have functions deployed needs its own Blaze upgrade and its own budget.
+`magemai` is the project the owner is moving to Blaze. Automated tests do not need Blaze and do not run against it. There is no second cloud project to upgrade.
 
 ### 22.3 Alerts, before the first deploy
 
-On the billing account, for each Blaze project:
+On the billing account linked to `magemai`, before any functions deploy:
 
 - A monthly budget chosen by the owner. A pre-launch project often starts with a budget on the order of USD 25–50. The number is the owner's.
 - Alerts at 50%, 90%, and 100% of that budget.
-- A Cloud Run spend cap. 2nd gen functions run on Cloud Run, so this cap bounds function spend. The cap should sit at a level that stops a runaway deploy without blocking a normal staging test. Minimum instances stay at 0 so idle functions do not bill.
+- A Cloud Run spend cap. 2nd gen functions run on Cloud Run, so this cap bounds function spend. The cap should stop a runaway deploy without blocking an ordinary release. Minimum instances stay at 0 so idle functions do not bill.
 
-Rules `get()` of a membership adds one document read to each authorized read. That is the cost of fresh membership checks, and it is preferable to stale claims. Super-admin list pages paginate at 25 and use `getCountFromServer` for the overview counts, which is a real aggregation query, not a fabricated number.
+Rules `get()` of a membership adds one document read to each authorized member read. Platform reads add `exists` and `get` of `platformAdmins/{uid}` so revocation is visible before the ID token expires. That extra read is the point of the registry. Super-admin list pages paginate at 25 and use `getCountFromServer` for the overview counts, which is a real aggregation query, not a fabricated number.
 
-No production resources are deployed without an explicit owner decision.
+No resources are deployed to `magemai` without an explicit owner decision and the typed project-id and project-number confirmation in section 19.
 
 ## 23. Open questions and proposed decisions
 
-Each item is a place the blueprint or the instructions left a choice open, or where two lines of the blueprint can be read differently. **Phase 1 will implement the proposed default** unless the owner overrides it before step 4. Overrides are written back into the relevant section of this document.
+Each item is a place the blueprint or the instructions left a choice open, or where two lines of the blueprint can be read differently. **Phase 1 will implement the proposed default** unless the owner overrides it before step 4. OQ-1, OQ-2, OQ-20, and OQ-23 were approved in the review of PR #1 and are closed. Overrides of the remaining items are written back into the relevant section of this document.
 
 ### OQ-1. Cloud region
 
-**Ambiguity.** No region is specified. The Firestore location is permanent.
+**Status.** Approved. Closed. Decision D13.
 
-**Default.** `asia-south1` (Mumbai) for Firestore and for Functions. It is the closest common single region to Sri Lanka. A multi-region location costs more and is not justified before launch traffic.
-
-**If overridden.** Pick the region before the first Firestore write. `asia-southeast1` (Singapore) is the likely alternative. Functions move to the same region.
+**Decision.** `asia-south1` (Mumbai) for Firestore and for Functions. It is the closest common single region to Sri Lanka. A multi-region location costs more and is not justified before launch traffic. The Firestore location is permanent. Enable it on `magemai` only in this region.
 
 ### OQ-2. Money units
 
-**Ambiguity.** The blueprint requires integer minor units, and its illustration shows amount `15000` displayed as LKR 15,000.00. Those two statements use different units. 15,000.00 LKR is `1500000` minor units when LKR's exponent is 2.
+**Status.** Approved. Closed. Decision D10.
 
-**Default.** Integer minor units win. Phase 1 stores no amounts, only the ISO currency code. The field name will be `amountMinor` when money arrives.
+**Ambiguity that was resolved.** The blueprint requires integer minor units, and its illustration shows amount `15000` displayed as LKR 15,000.00. Those two statements use different units. 15,000.00 LKR is `1500000` minor units when LKR's exponent is 2.
 
-**If overridden.** Any other unit has to be chosen before the first payment or invoice document is written. Changing it later rewrites financial history.
+**Decision.** Integer minor units. Phase 1 stores no amounts, only the ISO currency code. The field name will be `amountMinor` when money arrives.
 
 ### OQ-3. Email verification gate
 
@@ -1058,7 +1186,7 @@ Each item is a place the blueprint or the instructions left a choice open, or wh
 
 **Ambiguity.** Public profiles are part of the product and are scheduled for Phase 3. Phase 1 still creates the business document.
 
-**Default.** Active members and super-admins only. No public Firestore read and no public Storage read.
+**Default.** Active members, and platform admins who pass `isActivePlatformAdmin()` (claim plus an active registry document). No public Firestore read and no public Storage read. A stale `superAdmin` claim does not qualify.
 
 **If overridden.** A public read rule has to exclude fields that are not meant for the marketplace, or it will publish contact details early.
 
@@ -1138,7 +1266,7 @@ Each item is a place the blueprint or the instructions left a choice open, or wh
 
 **Ambiguity.** "Every privileged administrative action" is required. Ordinary profile edits are not mentioned.
 
-**Default.** Audit the action catalog in section 8.7. Do not audit display-name, phone, or locale edits.
+**Default.** Audit the action catalog in section 8.8. Do not audit display-name, phone, or locale edits.
 
 **If overridden.** Adding those events is safe. Removing a catalog event for status or verification would miss an acceptance criterion.
 
@@ -1176,11 +1304,9 @@ Each item is a place the blueprint or the instructions left a choice open, or wh
 
 ### OQ-20. Confirm the collection layout
 
-**Ambiguity.** The blueprint allows either subcollections or a `businessId` field and asks for one strategy.
+**Status.** Approved. Closed. Decision D3.
 
-**Default.** Root collections for the Phase 1 platform documents in section 8. Subcollections under `businesses/{businessId}` for future operational data. Membership ids are deterministic.
-
-**If overridden.** Choosing root collections for bookings and customers as well is viable and should be decided before Phase 2. Phase 1 rules do not need to change either way, because those collections are not created now.
+**Decision.** Root collections for the Phase 1 platform documents in section 8, including `platformAdmins`. Subcollections under `businesses/{businessId}` for future operational data. Membership ids are deterministic.
 
 ### OQ-21. Active business in the URL
 
@@ -1200,19 +1326,15 @@ Each item is a place the blueprint or the instructions left a choice open, or wh
 
 ### OQ-23. Production hostname
 
-**Ambiguity.** No domain has been cleared. The blueprint forbids assuming one.
+**Status.** Approved. Closed. Decision D12.
 
-**Default.** Use the `web.app` and `firebaseapp.com` hostnames Firebase assigns to the project that was created. Do not copy the sample hostname from the blueprint into `firebase.json`, Auth authorized domains, or the README. Do not put a custom domain there either.
-
-**If overridden.** Add a domain only after the owner confirms clearance, and add it to Auth authorized domains in the same change.
+**Decision.** Use only the `web.app` and `firebaseapp.com` hostnames Firebase assigns. For the live project those are `magemai.web.app` and `magemai.firebaseapp.com`, because the project id is `magemai`. They are recorded in section 19 for that reason. No custom domain is added. A cleared custom domain would be a new decision, not a silent config change.
 
 ### OQ-24. Firebase project ids
 
-**Ambiguity.** The projects do not exist yet.
+**Status.** Decided by the owner. One cloud project.
 
-**Default.** The owner creates three projects during setup and records the ids locally. Examples in the docs are not commitments. Emulators use `demo-magemai` so contributors can run tests before they have cloud access.
-
-**If overridden.** One shared project for staging and production would mix data and claims. The plan keeps three.
+**Decision.** The cloud project is `magemai`, project number `122706427013`, support email `mavixas.ceo@gmail.com`. The owner is upgrading it to Blaze. Local development and CI stay on the Emulator Suite (`demo-magemai`). There is no dev, staging, or production Firebase project. Environment variables still carry the project id (section 19), so another project could be added later without a code change. Tests and destructive scripts do not run against `magemai`. A deploy or a live operator script requires the operator to type the project id and the project number.
 
 ### OQ-25. Accent color
 
@@ -1248,4 +1370,4 @@ Each item is a place the blueprint or the instructions left a choice open, or wh
 
 ---
 
-These defaults are enough to implement Phase 1 without another architecture pass. The items that are expensive to change later are OQ-1 (region), OQ-2 (money units, before any amount is stored), OQ-20 (collection layout, before Phase 2), and OQ-23 (hostname, before public launch).
+These defaults are enough to implement Phase 1 without another architecture pass. OQ-1 (region), OQ-2 (money units), OQ-20 (collection layout), and OQ-23 (Firebase-assigned hostnames only) are owner-approved and stay unchanged. The `platformAdmins` registry is an addition under that same collection layout.

@@ -6,7 +6,7 @@
 
 This checklist is workflow steps 4–12 from the product owner's instructions. Steps 1–3 (inspect the repository, write the architecture, write these docs) are the planning pass that produced [architecture.md](./architecture.md), [setup.md](./setup.md), and [magemai-blueprint.md](./magemai-blueprint.md).
 
-Do not start step 4 until the owner has accepted [architecture.md](./architecture.md) or overridden items in its open-questions section. Implement the proposed defaults in that section. Do not start Phase 2 from this list. Do not seed or special-case the pilot business named in the blueprint.
+The owner approved the architecture direction and locked four decisions: `asia-south1`, integer minor units with ISO 4217 codes, platform root collections plus business subcollections for later operational data, and Firebase-assigned `web.app` / `firebaseapp.com` hostnames only. Implement those unchanged. The only cloud project is `magemai` (number `122706427013`). Local development and automated tests use the Emulator Suite (`demo-magemai`). Do not create a dev or staging project. Implement the other proposed defaults in the architecture, including the `platformAdmins` registry. Do not start Phase 2 from this list. Do not seed or special-case the pilot business named in the blueprint.
 
 ## How to check a box
 
@@ -51,8 +51,12 @@ The blueprint's Phase 1 acceptance criteria. The step column is where the work h
 - [ ] Add Vitest, React Testing Library, and jsdom. Wire `npm test`.
 - [ ] Add the Firebase JS SDK and `src/lib/firebase` client initialization, including the emulator connection when `VITE_USE_FIREBASE_EMULATORS=true`.
 - [ ] Production builds must refuse to start when the emulator flag is true.
-- [ ] Add `firebase.json` emulator config (Auth, Firestore, Functions, Storage, Hosting, UI) and `.firebaserc` aliases without committing secret project data. Document `demo-magemai` for emulator-only runs.
-- [ ] Add `.env.example` with the variable names from architecture section 19 and empty values.
+- [ ] Add `firebase.json` emulator config (Auth, Firestore, Functions, Storage, Hosting, UI). `.firebaserc` sets `default` to `magemai` only. Emulator commands pass `--project demo-magemai`. Do not add dev, staging, or prod project aliases.
+- [ ] Add `.env.example` with the variable names from architecture section 19 and empty values. `.env.development` targets the emulators. `.env.production` is gitignored and, when created for a real build, targets `magemai`. Project id stays in those variables so another project could be added later without a code change.
+- [ ] Test scripts (`npm test`, `npm run test:rules`, `npm run test:e2e`, `npm run test:all`) use `demo-magemai` and fail if the project id is `magemai`.
+- [ ] No script deletes or overwrites collections on `magemai`. A later maintenance script of that kind must refuse that project id.
+- [ ] Deploy, seed, and super-admin scripts that can write to `magemai` print the project id and project number and continue only after the operator types `magemai` and `122706427013`.
+- [ ] Document the budget alerts and Cloud Run spend cap for `magemai` in `docs/setup.md`, and do not deploy functions before they exist.
 - [ ] Confirm `.gitignore` excludes `.env.*` (except `.env.example`), service-account JSON, and Firebase debug logs.
 - [ ] Add `shared/` and the Vite `@shared` alias. Functions consume the same folder.
 - [ ] Add `src/config/brand.ts` with the product name, endorsement, and tagline. Document title template `{page} · Magemai`.
@@ -158,11 +162,16 @@ Maps to AC-7, AC-8, AC-9, AC-15, AC-16.
 
 Maps to AC-11, AC-13, AC-15.
 
-- [ ] Implement `scripts/provision-super-admin.ts` exactly to the contract in architecture section 17.3, including `--revoke`, the confirmation prompt, claim merge, user-document bootstrap, and audit rows `super_admin.provision` and `super_admin.revoke`.
-- [ ] Wire `npm run provision:super-admin`. The script reads `GOOGLE_APPLICATION_CREDENTIALS` and has no claim-setting callable beside it.
+- [ ] Implement `scripts/provision-super-admin.ts` to the contract in architecture section 17.3.
+- [ ] Grant writes `platformAdmins/{uid}` to `status: "active"` (with `grantedBy` and `grantedAt`) before it merges the `superAdmin` claim, then writes `super_admin.provision`.
+- [ ] `--revoke` requires `--reason`. It sets `status: "revoked"` with `revokedBy`, `revokedAt`, and `reason` first, then calls `revokeRefreshTokens`, then removes the claim, then writes `super_admin.revoke`. It does not delete the Auth user or the registry document.
+- [ ] Re-running grant or revoke is idempotent, as in the architecture table: no duplicate audit row when the desired state is already stored, and a re-grant clears the revocation fields and writes one new audit row.
+- [ ] A failed run exits non-zero, prints the last successful step, and is safe to re-run. A partial grant does not authorize platform reads. A partial revoke does not leave them authorized.
+- [ ] Wire `npm run provision:super-admin`. The script reads `GOOGLE_APPLICATION_CREDENTIALS` and has no claim-setting or registry-writing callable beside it.
+- [ ] `assertActivePlatformAdmin` runs on every `setBusinessStatus` and `setBusinessVerification` call and requires both the claim and `platformAdmins/{uid}.status == "active"`.
 - [ ] Document the command and the service-account requirements in `docs/setup.md` if the implemented flags differ from the plan.
-- [ ] `/super-admin` guard: loading state, then login redirect, then verification redirect, then a 403 state when the claim is absent. The business dashboard is not used as the denial screen.
-- [ ] Navigation for super-admin is shown from the ID token claim. Functions do not trust that check.
+- [ ] `/super-admin` guard: loading state, then login redirect, then verification redirect, then a 403 state when the claim is absent or the caller's registry document is missing or `revoked`. The business dashboard is not used as the denial screen.
+- [ ] Navigation for super-admin is shown from the ID token claim only. A stale claim plus a revoked registry still ends on the 403 state once the registry read returns. Functions do not trust the claim alone.
 - [ ] Overview uses `getCountFromServer` for users and businesses.
 - [ ] `/super-admin/users` lists email, display name, status, email verified, and created time. Paginated by 25. Read-only (OQ-10).
 - [ ] `/super-admin/businesses` lists name, slug, owner, status, verification, and created time. Paginated by 25.
@@ -183,7 +192,9 @@ Maps to AC-6, AC-10, AC-11, AC-12, AC-13.
 - [ ] `firestore.indexes.json` contains the composite indexes from architecture section 15.
 - [ ] `stripDownloadTokens` removes download-token metadata on finalize. `setBusinessImage` and `setUserAvatar` strip it as well.
 - [ ] Application code does not call `getDownloadURL`. Search the repo and record the result.
-- [ ] Rules helpers `exists()` before `get()` on the membership path.
+- [ ] Rules helper `isActivePlatformAdmin()` matches architecture section 15: signed in, `request.auth.token.superAdmin == true`, `exists` on `platformAdmins/{request.auth.uid}`, then `get` and `status == "active"`. No allow rule treats the claim as sufficient.
+- [ ] Client create, update, and delete of `platformAdmins` are denied for every caller.
+- [ ] Rules helpers `exists()` before `get()` on the membership path and on the platform-admin path.
 - [ ] Wire `npm run test:rules` with `@firebase/rules-unit-testing` and the emulators.
 - [ ] XT-1 Member of A cannot read business B.
 - [ ] XT-2 Member of A cannot read B's membership.
@@ -198,13 +209,18 @@ Maps to AC-6, AC-10, AC-11, AC-12, AC-13.
 - [ ] XT-11 A non-admin callable `setBusinessStatus` returns `permission-denied`.
 - [ ] XT-12 Staff cannot read their business's audit logs.
 - [ ] XT-13 Owner can read their business audit logs and cannot read platform audit logs.
-- [ ] XT-14 Super-admin can read both businesses, users, and platform audit logs.
-- [ ] XT-15 Super-admin client SDK cannot write audit logs, businesses, or memberships.
+- [ ] XT-14 Active platform admin (claim and registry `active`) can read both businesses, users, and platform audit logs.
+- [ ] XT-15 That admin's client SDK cannot write audit logs, businesses, memberships, or `platformAdmins`.
 - [ ] XT-16 Signed-out clients cannot read protected documents or brand objects.
 - [ ] XT-17 SVG, HEIC, and oversize uploads are denied.
 - [ ] XT-18 The private prefix is denied for read and write.
 - [ ] XT-19 Registration does not set `superAdmin`.
 - [ ] XT-20 `createBusiness` ignores client-supplied role, status, and verification.
+- [ ] XT-21 Active super-admin (claim true and `platformAdmins` status `active`) can read users, businesses, and platform audit logs, and `setBusinessStatus` is authorized.
+- [ ] XT-22 Normal user, with no claim and no registry document, is denied those platform reads.
+- [ ] XT-23 Revoked super-admin (registry `revoked`, claim absent) is denied those platform reads and `setBusinessStatus`.
+- [ ] XT-24 Revoked admin whose test token still has `superAdmin: true` is denied those platform reads and `setBusinessStatus`.
+- [ ] XT-25 Normal user cannot create or update a `platformAdmins` record. The same test denies that write from an active super-admin's client SDK.
 - [ ] Positive cases from architecture section 20.4: owner reads their business, owner uploads a small PNG, staff cannot update settings, super-admin suspension writes an audit row.
 - [ ] If the member-list query shape is rejected by rules, add `listBusinessMembers` and test it. Do not open the collection.
 - [ ] Confirm the Admin SDK call that clears download tokens against the emulator, and note any difference in `docs/setup.md`.
@@ -222,10 +238,12 @@ Maps to AC-16 and AC-17. Also re-runs the flows behind AC-1 through AC-15.
 - [ ] E2E: sign out and confirm `/admin` returns to `/login`.
 - [ ] E2E: password reset through the emulator out-of-band code.
 - [ ] E2E: normal user opening `/super-admin` sees 403.
-- [ ] E2E: provisioned super-admin sees both lists, suspends a business, and the owner sees the banner and a disabled profile form.
+- [ ] E2E, on the emulator project `demo-magemai` only: provisioned super-admin (claim and active registry) sees both lists, suspends a business, and the owner sees the banner and a disabled profile form.
+- [ ] E2E: after the registry is set to `revoked` while the test session token still has `superAdmin: true`, the user list does not load and the screen is the 403 or authorization error state.
+- [ ] Do not point Playwright, the rules suite, or a data wipe at the live project `magemai`.
 - [ ] E2E: the audit list shows the suspension.
 - [ ] E2E: Google sign-in through the Auth emulator's simulated provider.
-- [ ] Manual, only if a cloud project with a Google OAuth client is available: Google sign-in on the development project. If it was not run, leave AC-2's real-provider half documented as not run. Do not mark it passed.
+- [ ] Manual, only if Google sign-in is enabled on `magemai` and the owner agrees to a non-destructive sign-in check: Google sign-in against that project. If it was not run, leave AC-2's real-provider half documented as not run. Do not mark it passed. Do not create or delete businesses on `magemai` as part of the test run.
 - [ ] Add the CI entry point `npm run test:all` that runs unit tests, rules tests, and Playwright under the emulators.
 - [ ] Add a CI workflow that runs `npm run test:all` without service-account credentials.
 - [ ] Fix failures. Do not bypass a rule to make a test pass.
@@ -241,7 +259,7 @@ Maps to AC-18.
 - [ ] Check the boxes in this file that are truly done. Leave the others open.
 - [ ] Update the README status from planning to the actual Phase 1 state.
 - [ ] Confirm `.env.example` still lists names only.
-- [ ] Confirm no service account, `.env` file, or filled production hostname was committed.
+- [ ] Confirm no service account, filled `.env` file, web API key, or custom domain was committed. The assigned hostnames `magemai.web.app` and `magemai.firebaseapp.com` are documented on purpose.
 - [ ] Confirm a repository search finds no special case for the pilot business.
 
 ## Step 12 — Completion report
@@ -251,7 +269,7 @@ Write the report only after step 10 has been run. Include:
 - [ ] Implemented features, mapped against AC-1 through AC-18. Any open criterion stays open and is explained.
 - [ ] The folder structure that was actually created.
 - [ ] Architecture decisions that changed during implementation.
-- [ ] Firebase configuration status: which projects exist, whether Blaze is enabled, whether anything was deployed. Deployment still requires an explicit owner decision.
+- [ ] Firebase configuration status: the single cloud project `magemai`, whether Blaze and budget alerts are in place, and whether anything was deployed. A deploy still requires an explicit owner decision and the typed project-id and project-number confirmation. Tests ran on `demo-magemai` only.
 - [ ] Security summary: rules, storage token stripping, provisioning path, and the XT results.
 - [ ] Test results: commands, pass or fail, and tests that were not run because credentials or a cloud project were missing.
 - [ ] Setup instructions, pointing at `docs/setup.md`.
