@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "magemai"
+    "default": "demo-magemai",
+    "live": "magemai"
   }
 }

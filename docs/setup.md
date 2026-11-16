@@ -264,7 +264,7 @@ Enable Cloud Storage in the same region. Enable Authentication as in section 5. 
 
 Use the project id `demo-magemai` for every emulator run, including CI. `demo-` projects are reserved by the emulator and do not touch `magemai`. Start them with `npm run emulators:start` (section 2.6 and architecture section 24). That command is the only supported start path. It passes `--project demo-magemai` itself. Use Node 24 in CI so the Functions emulator matches the `nodejs24` runtime. Node 26 is supported on a developer PC.
 
-`.firebaserc` maps `default` to `magemai` so a deliberate deploy has one target. Emulator commands always pass `--project demo-magemai` and do not use that default. Do not add `dev`, `staging`, or `prod` aliases.
+`.firebaserc` maps `default` to `demo-magemai`. `npx firebase use` prints that id. A Firebase CLI command without `--project`, including a bare `firebase deploy`, stays on `demo-magemai` and does not touch the live project. The live project is available only as the alias `live`, so the operator must pass `--project live` or `--project magemai`. Do not run `firebase use live`, because that rewrites the default. Emulator commands still pass `--project demo-magemai` themselves. Do not add `dev`, `staging`, or `prod` aliases.
 
 ### 4.3 Safeguards
 
@@ -521,8 +521,10 @@ npm run build -- --mode production
 Then deploy. The command must print project id `magemai` and project number `122706427013` and wait until the operator types both. A wrapper added in the checklist does that before it invokes the CLI:
 
 ```bash
-firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting --project magemai
+firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting --project live
 ```
+
+`--project magemai` is the same target. A command that omits `--project` uses the `.firebaserc` default, `demo-magemai`, and does not deploy the live project.
 
 There is no staging project to deploy to first. This setup guide does not authorize the deploy. Do not aim a test command at `magemai`.
 

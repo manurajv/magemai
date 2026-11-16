@@ -38,7 +38,9 @@ describe("toolchain contract", () => {
     expect(firebase.emulators.ui.enabled).toBe(true);
     expect(firebase.emulators.ui.port).toBe(4000);
     const rc = JSON.parse(read(".firebaserc")) as { projects: Record<string, string> };
-    expect(rc.projects.default).toBe("magemai");
+    expect(rc.projects.default).toBe("demo-magemai");
+    expect(rc.projects.live).toBe("magemai");
+    expect(Object.keys(rc.projects).sort()).toEqual(["default", "live"]);
     expect(rc.projects.dev).toBeUndefined();
     expect(rc.projects.staging).toBeUndefined();
     expect(rc.projects.prod).toBeUndefined();

@@ -108,7 +108,7 @@ magemai/
 ├── firestore.indexes.json
 ├── storage.rules
 ├── firebase.json
-├── .firebaserc                     # default project id magemai; emulators pass demo-magemai explicitly
+├── .firebaserc                     # default demo-magemai; live alias is magemai and must be named explicitly
 ├── docs/
 └── README.md
 ```
@@ -950,7 +950,7 @@ Those two hostnames are the ones Firebase assigns to project id `magemai`. They 
 | `npm run dev`, unit tests, rules tests, Playwright, CI | `demo-magemai` on the Emulator Suite | The default. No cloud credentials. |
 | An explicit build or deploy, seed, or super-admin script | `magemai` | Only after the confirmation in the safeguards below. |
 
-`.firebaserc` sets `default` to `magemai` so a deliberate deploy has one target. Emulator commands pass `--project demo-magemai` and do not rely on that default. There are no `dev`, `staging`, or `prod` project aliases.
+`.firebaserc` sets `default` to `demo-magemai`. A bare `firebase deploy`, or any Firebase CLI command that omits `--project`, therefore targets the demo project and cannot reach the live project. The live project is the alias `live`. A human names it with `--project live` or `--project magemai`. Do not run `firebase use live`: that command rewrites `projects.default`. There are no `dev`, `staging`, or `prod` project aliases. Emulator scripts still pass `--project demo-magemai` themselves.
 
 Authorized Auth domains for `magemai` are `localhost`, `127.0.0.1`, `magemai.web.app`, and `magemai.firebaseapp.com`. The OAuth consent screen support email is `mavixas.ceo@gmail.com`. No custom domain is added.
 
@@ -1103,7 +1103,7 @@ There is one deploy target: project `magemai`, region `asia-south1`. Nothing in 
 1. Confirm Firestore on `magemai` is in `asia-south1`, and deploy Functions to that same region, before the first write.
 2. Confirm Blaze and the budget alerts in section 22 before the first functions deploy. The owner is upgrading `magemai` to Blaze. This document does not authorize that deploy.
 3. Build with `--mode production` so `VITE_USE_FIREBASE_EMULATORS` is false and `VITE_FIREBASE_PROJECT_ID` is `magemai`. The build fails if the emulator flag is `true` (section 24.5).
-4. Run `firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting --project magemai` only after the operator types project id `magemai` and project number `122706427013`.
+4. Run `firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting --project magemai` only after the operator types project id `magemai` and project number `122706427013`. `--project live` is the same target. A command that omits `--project` uses the `.firebaserc` default, `demo-magemai`.
 
 Hosting is a single-page app. `index.html` is not cached for long; hashed assets are. All routes rewrite to `index.html`. The live build must have `VITE_USE_FIREBASE_EMULATORS` unset or `false`.
 

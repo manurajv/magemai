@@ -31,7 +31,7 @@ npm run emulators:start
 npm run emulators:seed
 ```
 
-`.firebaserc` names `magemai` as the default project. The emulator scripts ignore that default and pass `--project demo-magemai` themselves.
+`.firebaserc` names `demo-magemai` as the default project, so a Firebase CLI command without `--project` stays on the demo project. The live project is the alias `live` and has to be named explicitly. Emulator scripts still pass `--project demo-magemai` themselves.
 
 ## Documentation
 
