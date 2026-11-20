@@ -147,6 +147,8 @@ The first GitHub Actions run of `npm run test:all` failed the same desktop auth 
 
 After the callable and email-verification fixes, the commands in the table were run again. `npm run test:e2e` exercises `checkSlugAvailability`, `createBusiness`, and `syncAuthProfile` on the emulators. An intermediate full Playwright run failed the verification step because React strict mode applied the out-of-band code twice. The page now applies each code once. The confirming `npm run test:e2e` is the 29 passed count in the table.
 
+GitHub Actions on `928b48d` failed `XT-21` in `tests/rules/platform-admin.test.ts` at Vitest's 5 second default. The callable had returned; the cold Functions emulator made that first call too slow. The rules config now allows 20 seconds for a test.
+
 Not run:
 
 - `npm run test:e2e:live` and `npm run test:cleanup:live`. They talk to project `magemai`.
