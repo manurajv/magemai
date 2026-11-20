@@ -8,6 +8,7 @@ const viewport = {
 
 export default defineConfig({
   testDir: "tests/e2e",
+  testIgnore: ["**/live.spec.ts"],
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
@@ -22,6 +23,12 @@ export default defineConfig({
     url: "http://127.0.0.1:5173",
     reuseExistingServer: process.env.MAGEMAI_E2E_REUSE === "1",
     timeout: 120_000,
+    env: {
+      VITE_USE_FIREBASE_EMULATORS: "true",
+      VITE_FIREBASE_PROJECT_ID: "demo-magemai",
+      VITE_FIREBASE_EMULATOR_HOST: "127.0.0.1",
+      VITE_GOOGLE_AUTH_ENABLED: "true",
+    },
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: viewport.desktop } },

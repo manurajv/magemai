@@ -1,0 +1,15 @@
+export const BUSINESS_NAME_MIN = 2;
+export const BUSINESS_NAME_MAX = 80;
+export const SLUG_MIN = 3;
+export const SLUG_MAX = 48;
+export const DESCRIPTION_MAX = 2000;
+export const ADDRESS_LINE_MAX = 120;
+export const CITY_MAX = 80;
+export const REGION_MAX = 80;
+export const POSTAL_CODE_MAX = 16;
+export const WEBSITE_MAX = 200;
+export const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+export const COVER_MAX_BYTES = 5 * 1024 * 1024;
+export const CREATIONS_PER_DAY = 10;
+export const OWNER_MEMBERSHIP_CAP = 25;
+export const CREATION_WINDOW_MS = 24 * 60 * 60 * 1000;

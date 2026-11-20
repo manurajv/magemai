@@ -7,15 +7,6 @@ export const FORBIDDEN_PROJECT_ID = "magemai";
 
 export const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const ENV_FILES = [
-  ".env",
-  ".env.local",
-  ".env.development",
-  ".env.development.local",
-  ".env.production",
-  ".env.production.local",
-] as const;
-
 const EMULATOR_HOST_VARS = [
   "FIREBASE_AUTH_EMULATOR_HOST",
   "FIRESTORE_EMULATOR_HOST",
@@ -27,12 +18,6 @@ export function assertDemoProject(projectId: string): void {
     throw new Error(
       `Refusing project id "${projectId}". Emulator commands only run as ${DEMO_PROJECT_ID}.`,
     );
-  }
-}
-
-export function assertLiveFirebaseNotAllowed(value: string | undefined): void {
-  if (value === "true") {
-    throw new Error("Refusing to run emulators while VITE_ALLOW_LIVE_FIREBASE is true.");
   }
 }
 
@@ -51,18 +36,6 @@ export function envFileSetsFlag(contents: string, name: string, expected: string
       value = value.slice(1, -1);
     }
     if (key === name && value === expected) return true;
-  }
-  return false;
-}
-
-export function liveFirebaseOptIn(root: string, env: NodeJS.ProcessEnv = process.env): boolean {
-  if (env.VITE_ALLOW_LIVE_FIREBASE === "true") return true;
-  for (const file of ENV_FILES) {
-    const full = path.join(root, file);
-    if (!fs.existsSync(full)) continue;
-    if (envFileSetsFlag(fs.readFileSync(full, "utf8"), "VITE_ALLOW_LIVE_FIREBASE", "true")) {
-      return true;
-    }
   }
   return false;
 }
@@ -90,14 +63,10 @@ export function assertEmulatorHosts(env: NodeJS.ProcessEnv): void {
     }
   }
   const projectId = env.GCLOUD_PROJECT ?? env.GOOGLE_CLOUD_PROJECT ?? "";
-  if (projectId === FORBIDDEN_PROJECT_ID) {
-    throw new Error("Refusing to run tests against project id magemai.");
-  }
   if (projectId && projectId !== DEMO_PROJECT_ID) {
-    throw new Error(`Refusing to run tests against project id "${projectId}".`);
-  }
-  if (env.VITE_ALLOW_LIVE_FIREBASE === "true") {
-    throw new Error("Refusing to run tests while VITE_ALLOW_LIVE_FIREBASE is true.");
+    throw new Error(
+      `Emulator tests only run as ${DEMO_PROJECT_ID}. Received project id "${projectId}".`,
+    );
   }
 }
 

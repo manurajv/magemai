@@ -16,35 +16,6 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)).data.status == 'active';
     }
 
-    function userCreateShape(uid) {
-      return request.resource.data.keys().hasOnly([
-          'id',
-          'email',
-          'emailVerified',
-          'displayName',
-          'phoneNumber',
-          'photoPath',
-          'locale',
-          'status',
-          'createdAt',
-          'updatedAt',
-          'lastLoginAt'
-        ])
-        && request.resource.data.id == uid
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.emailVerified == request.auth.token.email_verified
-        && request.resource.data.status == 'active'
-        && request.resource.data.photoPath == null
-        && request.resource.data.phoneNumber == null
-        && request.resource.data.locale == 'en'
-        && request.resource.data.displayName is string
-        && request.resource.data.displayName.size() >= 1
-        && request.resource.data.displayName.size() <= 80
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.updatedAt == request.time
-        && request.resource.data.lastLoginAt == null;
-    }
-
     function userUpdateAllowed() {
       return request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['displayName', 'phoneNumber', 'locale', 'updatedAt'])
@@ -59,14 +30,58 @@ service cloud.firestore {
         && request.resource.data.locale == 'en';
     }
 
-    // Step 5: the signed-in person can read and update their own profile.
-    // Every other collection stays deny-all until step 9.
+    function memberPath(businessId) {
+      return /databases/$(database)/documents/businessMembers/$(businessId + '_' + request.auth.uid);
+    }
+
+    function isActiveMember(businessId) {
+      return isSignedIn()
+        && exists(memberPath(businessId))
+        && get(memberPath(businessId)).data.status == 'active'
+        && get(memberPath(businessId)).data.userId == request.auth.uid;
+    }
+
+    function isActiveManager(businessId) {
+      return isActiveMember(businessId)
+        && get(memberPath(businessId)).data.role in ['owner', 'admin', 'manager'];
+    }
+
+    // Profile creation is the syncAuthProfile callable. Clients may update
+    // only the allow-list. Business records, slugs, and audit logs stay deny-all.
     match /users/{uid} {
       allow get: if isSelf(uid) || isActivePlatformAdmin();
       allow list: if isActivePlatformAdmin();
-      allow create: if isSelf(uid) && userCreateShape(uid);
+      allow create: if false;
       allow update: if isSelf(uid) && userUpdateAllowed();
       allow delete: if false;
+    }
+
+    match /platformSettings/{id} {
+      allow get: if isSignedIn() && (id == 'global' || isActivePlatformAdmin());
+      allow list: if isActivePlatformAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /businesses/{businessId} {
+      allow get: if isActiveMember(businessId) || isActivePlatformAdmin();
+      allow list: if isActivePlatformAdmin();
+      allow create, update, delete: if false;
+    }
+
+    // A manager list filtered by businessId is intentionally omitted.
+    // That query depends on resource data inside get(), which the rules
+    // language rejects. Step 6 does not need a staff directory.
+    match /businessMembers/{memberId} {
+      allow get: if isSignedIn() && (
+        resource.data.userId == request.auth.uid
+        || isActivePlatformAdmin()
+        || isActiveManager(resource.data.businessId)
+      );
+      allow list: if isSignedIn() && (
+        resource.data.userId == request.auth.uid
+        || isActivePlatformAdmin()
+      );
+      allow create, update, delete: if false;
     }
 
     match /{document=**} {

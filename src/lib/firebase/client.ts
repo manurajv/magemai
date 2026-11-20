@@ -6,8 +6,6 @@ import { connectStorageEmulator, getStorage, type FirebaseStorage } from "fireba
 import { FUNCTIONS_REGION } from "@shared/firebase/region";
 import {
   EMULATOR_PORTS,
-  LIVE_FIREBASE_BANNER,
-  LIVE_FLAG_IGNORED_WARNING,
   firebaseWebConfig,
   readClientEnv,
   resolveFirebaseAccess,
@@ -28,24 +26,10 @@ export type FirebaseServices = {
 
 type EmulatorFlags = {
   __magemaiEmulatorsConnected?: boolean;
-  __magemaiLiveWarningShown?: boolean;
-  __magemaiLiveFlagIgnoredShown?: boolean;
 };
 
 function flags(): EmulatorFlags {
   return globalThis as EmulatorFlags;
-}
-
-function warnOnce(kind: "live" | "ignored", message: string): void {
-  const state = flags();
-  if (kind === "live") {
-    if (state.__magemaiLiveWarningShown) return;
-    state.__magemaiLiveWarningShown = true;
-  } else {
-    if (state.__magemaiLiveFlagIgnoredShown) return;
-    state.__magemaiLiveFlagIgnoredShown = true;
-  }
-  console.warn(message);
 }
 
 /**
@@ -54,10 +38,6 @@ function warnOnce(kind: "live" | "ignored", message: string): void {
  */
 export function createFirebase(env: FirebaseClientEnv): FirebaseServices {
   const access = resolveFirebaseAccess(env);
-  for (const warning of access.warnings) {
-    if (warning === LIVE_FLAG_IGNORED_WARNING) warnOnce("ignored", warning);
-  }
-  if (access.mode === "live") warnOnce("live", LIVE_FIREBASE_BANNER);
 
   if (getApps().length === 0) {
     initializeApp(firebaseWebConfig(env, access));

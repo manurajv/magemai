@@ -1,60 +1,30 @@
-import { region } from "firebase-functions/v1";
-import { FUNCTIONS_REGION } from "../../shared/firebase/region.js";
+import { STORAGE_REGION } from "../../shared/firebase/region.js";
 import "./admin.js";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onObjectFinalized } from "firebase-functions/v2/storage";
 import { AVATAR_MAX_BYTES, isAvatarContentType } from "../../shared/profile/limits.js";
 import "./options.js";
+import { defaultBucket, stripDownloadTokens as stripObjectTokens } from "./storage.js";
 
 const AVATAR_PATH = (uid: string) => `users/${uid}/avatar`;
 
-function bucket() {
-  const project = process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? "";
-  return getStorage().bucket(`${project}.appspot.com`);
+function authDisplayName(value: string | undefined): string {
+  return value?.trim() ?? "";
 }
 
-async function stripTokens(objectPath: string): Promise<void> {
-  const file = bucket().file(objectPath);
-  const [metadata] = await file.getMetadata();
-  const custom = metadata.metadata ?? {};
-  if (custom.magemaiDownloadTokenStripped === "true") return;
-  await file.setMetadata({
-    metadata: {
-      ...custom,
-      firebaseStorageDownloadTokens: null,
-      magemaiDownloadTokenStripped: "true",
-    },
-  });
+function shouldFillDisplayName(stored: unknown, authName: string): boolean {
+  return authName.length > 0 && (stored === "" || stored === "Member") && stored !== authName;
 }
 
-export const onAuthUserCreated = region(FUNCTIONS_REGION).auth.user().onCreate(async (record) => {
-  const ref = getFirestore().doc(`users/${record.uid}`);
-  const existing = await ref.get();
-  const system = {
-    id: record.uid,
-    email: record.email ?? "",
-    emailVerified: record.emailVerified,
-    status: "active" as const,
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-  if (existing.exists) {
-    await ref.update(system);
-    return;
-  }
-  await ref.set({
-    ...system,
-    displayName: record.displayName?.trim() ?? "",
-    phoneNumber: null,
-    photoPath: null,
-    locale: "en",
-    createdAt: FieldValue.serverTimestamp(),
-    lastLoginAt: null,
-  });
-});
-
+/**
+ * Creates `users/{uid}` when it is missing and refreshes Auth-owned fields.
+ * A 1st gen Auth trigger cannot run on the nodejs24 runtime, and
+ * `beforeUserCreated` needs Identity Platform, so this callable is the only
+ * profile-creation path. The client calls it after sign-up and sign-in, and
+ * again on app load when the document is missing.
+ */
 export const syncAuthProfile = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Sign in before syncing your profile.");
@@ -63,31 +33,46 @@ export const syncAuthProfile = onCall(async (request) => {
   if (record.disabled) {
     throw new HttpsError("permission-denied", "This account is disabled.");
   }
-  const ref = getFirestore().doc(`users/${record.uid}`);
-  const existing = await ref.get();
-  if (existing.exists && existing.get("status") === "disabled") {
-    throw new HttpsError("permission-denied", "This account is disabled.");
-  }
-  const system = {
-    id: record.uid,
-    email: record.email ?? "",
-    emailVerified: record.emailVerified,
-    lastLoginAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-  if (!existing.exists) {
-    await ref.set({
-      ...system,
-      displayName: record.displayName?.trim() ?? "",
-      phoneNumber: null,
-      photoPath: null,
-      locale: "en",
-      status: "active",
-      createdAt: FieldValue.serverTimestamp(),
-    });
-  } else {
-    await ref.update(system);
-  }
+  const db = getFirestore();
+  const ref = db.doc(`users/${record.uid}`);
+  const authName = authDisplayName(record.displayName);
+  await db.runTransaction(async (tx) => {
+    const existing = await tx.get(ref);
+    if (existing.exists && existing.get("status") === "disabled") {
+      throw new HttpsError("permission-denied", "This account is disabled.");
+    }
+    const system = {
+      id: record.uid,
+      email: record.email ?? "",
+      emailVerified: record.emailVerified,
+      lastLoginAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    if (!existing.exists) {
+      tx.set(ref, {
+        ...system,
+        displayName: authName,
+        phoneNumber: null,
+        photoPath: null,
+        locale: "en",
+        status: "active",
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      return;
+    }
+    const patch: {
+      id: string;
+      email: string;
+      emailVerified: boolean;
+      lastLoginAt: FieldValue;
+      updatedAt: FieldValue;
+      displayName?: string;
+    } = { ...system };
+    if (shouldFillDisplayName(existing.get("displayName"), authName)) {
+      patch.displayName = authName;
+    }
+    tx.update(ref, patch);
+  });
   return { ok: true };
 });
 
@@ -101,7 +86,8 @@ export const setUserAvatar = onCall(async (request) => {
     throw new HttpsError("permission-denied", "This account is disabled.");
   }
   const path = AVATAR_PATH(uid);
-  const file = bucket().file(path);
+  const bucket = defaultBucket();
+  const file = bucket.file(path);
   const [exists] = await file.exists();
   if (!exists) {
     throw new HttpsError("not-found", "Upload a profile photo before saving it.");
@@ -117,7 +103,7 @@ export const setUserAvatar = onCall(async (request) => {
   ) {
     throw new HttpsError("invalid-argument", "Choose a JPEG, PNG, or WebP image up to 2 MB.");
   }
-  await stripTokens(path);
+  await stripObjectTokens(bucket.name, path);
   const db = getFirestore();
   const userRef = db.doc(`users/${uid}`);
   const userSnap = await userRef.get();
@@ -150,8 +136,15 @@ export const setUserAvatar = onCall(async (request) => {
   return { photoPath: path };
 });
 
-export const stripDownloadTokens = onObjectFinalized(async (event) => {
+/**
+ * Storage triggers must run in the bucket's region. The default bucket is in
+ * us-east1. Callables stay on the global `asia-south1` option. The bucket
+ * name is left unset so the emulator listens to `<project>.appspot.com` and
+ * live listens to the default bucket from `FIREBASE_CONFIG`.
+ */
+export const stripDownloadTokens = onObjectFinalized({ region: STORAGE_REGION }, async (event) => {
   const name = event.data.name;
-  if (!name) return;
-  await stripTokens(name);
+  const bucketName = event.data.bucket;
+  if (!name || !bucketName) return;
+  await stripObjectTokens(bucketName, name);
 });

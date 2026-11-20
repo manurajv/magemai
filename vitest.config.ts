@@ -18,12 +18,7 @@ export default defineConfig((env) => {
       },
       define: {
         "import.meta.env.VITE_USE_FIREBASE_EMULATORS": JSON.stringify("true"),
-        "import.meta.env.VITE_FIREBASE_PROJECT_ID": JSON.stringify(
-          process.env.VITE_FIREBASE_PROJECT_ID === "magemai" ? "magemai" : "demo-magemai",
-        ),
-        "import.meta.env.VITE_ALLOW_LIVE_FIREBASE": JSON.stringify(
-          process.env.VITE_ALLOW_LIVE_FIREBASE === "true" ? "true" : "false",
-        ),
+        "import.meta.env.VITE_FIREBASE_PROJECT_ID": JSON.stringify("demo-magemai"),
         "import.meta.env.VITE_FIREBASE_EMULATOR_HOST": JSON.stringify("127.0.0.1"),
       },
       test: {

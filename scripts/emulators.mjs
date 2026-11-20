@@ -6,14 +6,12 @@ import {
   DEMO_PROJECT_ID,
   assertDemoProject,
   assertEmulatorHosts,
-  assertLiveFirebaseNotAllowed,
   buildExecArgs,
   buildExportArgs,
   buildSeedArgs,
   buildStartArgs,
   deleteEmulatorData,
   emulatorMetadataExists,
-  liveFirebaseOptIn,
   repoEmulatorDataDir,
   repoRoot,
   stripLiveCredentials,
@@ -39,11 +37,9 @@ function guardProject(args) {
 }
 
 function childEnv() {
-  assertLiveFirebaseNotAllowed(process.env.VITE_ALLOW_LIVE_FIREBASE);
-  if (liveFirebaseOptIn(repoRoot, process.env)) {
-    throw new Error("Refusing to run emulators while VITE_ALLOW_LIVE_FIREBASE is true.");
-  }
-  return stripLiveCredentials(process.env);
+  const env = stripLiveCredentials(process.env);
+  env.MAGEMAI_DEPLOY_BLOCKING_AUTH = "true";
+  return env;
 }
 
 function runFirebase(args) {

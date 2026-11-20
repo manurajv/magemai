@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { FirebaseContext, type FirebaseUiState } from "@/app/providers/firebase-context";
 import { ErrorState } from "@/components/shared/error-state";
-import { LiveFirebaseBanner } from "@/components/shared/live-firebase-banner";
 import { getFirebase } from "@/lib/firebase/client";
 
 export function FirebaseProvider({ children }: { children: ReactNode }) {
@@ -34,10 +33,5 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  return (
-    <FirebaseContext.Provider value={state}>
-      <LiveFirebaseBanner mode={state.mode} />
-      {children}
-    </FirebaseContext.Provider>
-  );
+  return <FirebaseContext.Provider value={state}>{children}</FirebaseContext.Provider>;
 }

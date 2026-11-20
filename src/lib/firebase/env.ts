@@ -1,12 +1,5 @@
 export const DEMO_PROJECT_ID = "demo-magemai";
 export const LIVE_PROJECT_ID = "magemai";
-export const DEFAULT_EMULATOR_HOST = "127.0.0.1";
-
-export const LIVE_FIREBASE_BANNER =
-  "LIVE FIREBASE — project magemai. This is not the emulator. Writes affect the real project.";
-
-export const LIVE_FLAG_IGNORED_WARNING =
-  "VITE_ALLOW_LIVE_FIREBASE was ignored because emulators are enabled.";
 
 export const EMULATOR_PORTS = {
   auth: 9099,
@@ -22,15 +15,14 @@ export type FirebaseMode = "emulator" | "live";
 export type FirebaseClientEnv = {
   dev: boolean;
   prod: boolean;
-  useEmulators?: string | undefined;
-  allowLive?: string | undefined;
-  projectId?: string | undefined;
-  emulatorHost?: string | undefined;
-  apiKey?: string | undefined;
-  authDomain?: string | undefined;
-  storageBucket?: string | undefined;
-  messagingSenderId?: string | undefined;
-  appId?: string | undefined;
+  useEmulators?: string;
+  projectId?: string;
+  emulatorHost?: string;
+  apiKey?: string;
+  authDomain?: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId?: string;
 };
 
 export type FirebaseAccess =
@@ -40,136 +32,86 @@ export type FirebaseAccess =
       emulatorHost: string;
       warnings: string[];
     }
-  | {
-      mode: "live";
-      projectId: string;
-      warnings: string[];
-    };
+  | { mode: "live"; projectId: string; warnings: string[] };
 
-export type FirebaseWebConfig = {
-  apiKey: string;
-  authDomain: string;
-  projectId: string;
-  storageBucket: string;
-  messagingSenderId: string;
-  appId: string;
-};
+const LOOPBACK_HOST = "127.0.0.1";
 
-function present(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : undefined;
-}
+const PRODUCTION_EMULATOR_ERROR =
+  "Production cannot connect to localhost. VITE_USE_FIREBASE_EMULATORS must not be true for a production build.";
 
 /**
- * Production builds fail when the emulator flag is on.
- * Vite calls this while loading config, before a bundle is emitted.
+ * Live is the default. The emulator is used only when
+ * `VITE_USE_FIREBASE_EMULATORS` is exactly `"true"`.
  */
-export function assertProductionBuildHasNoEmulators(
-  mode: string,
-  useEmulators: string | undefined,
-): void {
-  if (mode === "production" && present(useEmulators) === "true") {
-    throw new Error(
-      "Production cannot connect to localhost. VITE_USE_FIREBASE_EMULATORS must not be true for a production build.",
-    );
-  }
-}
-
 export function resolveFirebaseAccess(env: FirebaseClientEnv): FirebaseAccess {
-  const useEmulators = present(env.useEmulators);
-  const liveAllowed = present(env.allowLive) === "true";
-  const warnings: string[] = [];
-
-  if (env.prod && useEmulators === "true") {
-    throw new Error(
-      "Production cannot connect to localhost. VITE_USE_FIREBASE_EMULATORS must not be true.",
-    );
-  }
-
-  const emulatorRequested =
-    useEmulators === "true" || (env.dev && useEmulators !== "false" && !liveAllowed);
-
-  if (emulatorRequested) {
-    if (useEmulators === "true" && liveAllowed) {
-      warnings.push(LIVE_FLAG_IGNORED_WARNING);
-    }
-    const projectId = present(env.projectId) ?? DEMO_PROJECT_ID;
-    if (projectId === LIVE_PROJECT_ID) {
-      throw new Error("Refusing to connect emulators with project id magemai. Use demo-magemai.");
-    }
+  if (env.useEmulators === "true") {
+    if (env.prod) throw new Error(PRODUCTION_EMULATOR_ERROR);
+    const projectId = env.projectId ?? DEMO_PROJECT_ID;
     if (projectId !== DEMO_PROJECT_ID) {
       throw new Error(
-        `Emulators only allow project id ${DEMO_PROJECT_ID}. Received "${projectId}".`,
+        `Refusing to connect the emulators to project "${projectId}". Emulators only use ${DEMO_PROJECT_ID}.`,
       );
     }
-    const host = present(env.emulatorHost) ?? DEFAULT_EMULATOR_HOST;
-    if (host !== DEFAULT_EMULATOR_HOST) {
-      throw new Error(
-        `Firebase emulator host must be ${DEFAULT_EMULATOR_HOST}. Received "${host}".`,
-      );
+    const host = env.emulatorHost ?? LOOPBACK_HOST;
+    if (host !== LOOPBACK_HOST) {
+      throw new Error(`The emulator host must be ${LOOPBACK_HOST}. Received "${host}".`);
     }
-    return { mode: "emulator", projectId: DEMO_PROJECT_ID, emulatorHost: host, warnings };
+    return { mode: "emulator", projectId: DEMO_PROJECT_ID, emulatorHost: host, warnings: [] };
   }
 
-  if (env.prod) {
-    const projectId = present(env.projectId);
-    if (!projectId) {
-      throw new Error("A production build requires VITE_FIREBASE_PROJECT_ID.");
-    }
-    if (projectId === DEMO_PROJECT_ID) {
-      throw new Error("A production build cannot use project id demo-magemai.");
-    }
-    return { mode: "live", projectId, warnings };
-  }
-
-  if (!liveAllowed || useEmulators !== "false") {
+  const projectId = env.projectId?.trim() || LIVE_PROJECT_ID;
+  if (env.prod && projectId === DEMO_PROJECT_ID) {
     throw new Error(
-      "Live Firebase was not explicitly allowed. Set VITE_USE_FIREBASE_EMULATORS=false and VITE_ALLOW_LIVE_FIREBASE=true.",
+      `A production build cannot use the emulator project ${DEMO_PROJECT_ID}. Set VITE_FIREBASE_PROJECT_ID to ${LIVE_PROJECT_ID}.`,
     );
   }
-
-  const projectId = present(env.projectId);
-  if (projectId !== LIVE_PROJECT_ID) {
-    throw new Error("Live Firebase during development requires VITE_FIREBASE_PROJECT_ID=magemai.");
-  }
-
-  return { mode: "live", projectId, warnings };
+  return { mode: "live", projectId, warnings: [] };
 }
 
-export function firebaseWebConfig(
-  env: FirebaseClientEnv,
-  access: FirebaseAccess,
-): FirebaseWebConfig {
+export function assertProductionBuildHasNoEmulators(
+  mode: string | undefined,
+  useEmulators: string | undefined,
+): void {
+  if (mode === "production" && useEmulators === "true") {
+    throw new Error(PRODUCTION_EMULATOR_ERROR);
+  }
+}
+
+const LIVE_WEB_KEYS = [
+  ["apiKey", "VITE_FIREBASE_API_KEY"],
+  ["authDomain", "VITE_FIREBASE_AUTH_DOMAIN"],
+  ["storageBucket", "VITE_FIREBASE_STORAGE_BUCKET"],
+  ["messagingSenderId", "VITE_FIREBASE_MESSAGING_SENDER_ID"],
+  ["appId", "VITE_FIREBASE_APP_ID"],
+] as const;
+
+export function firebaseWebConfig(env: FirebaseClientEnv, access: FirebaseAccess) {
   if (access.mode === "emulator") {
     return {
-      apiKey: present(env.apiKey) ?? "demo-api-key",
-      authDomain: present(env.authDomain) ?? `${DEMO_PROJECT_ID}.firebaseapp.com`,
+      apiKey: env.apiKey || "demo-api-key",
+      authDomain: env.authDomain || "demo-magemai.firebaseapp.com",
       projectId: DEMO_PROJECT_ID,
-      storageBucket: present(env.storageBucket) ?? `${DEMO_PROJECT_ID}.appspot.com`,
-      messagingSenderId: present(env.messagingSenderId) ?? "000000000000",
-      appId: present(env.appId) ?? "1:000000000000:web:demo",
+      // The Storage emulator's bucket is always `{project}.appspot.com`.
+      // The live bucket `magemai.firebasestorage.app` comes from `.env.local`.
+      storageBucket: env.storageBucket || `${DEMO_PROJECT_ID}.appspot.com`,
+      messagingSenderId: env.messagingSenderId || "demo-sender",
+      appId: env.appId || "demo-app-id",
     };
   }
 
-  const fields: Array<[string, string | undefined]> = [
-    ["VITE_FIREBASE_API_KEY", env.apiKey],
-    ["VITE_FIREBASE_AUTH_DOMAIN", env.authDomain],
-    ["VITE_FIREBASE_STORAGE_BUCKET", env.storageBucket],
-    ["VITE_FIREBASE_MESSAGING_SENDER_ID", env.messagingSenderId],
-    ["VITE_FIREBASE_APP_ID", env.appId],
-  ];
-  const missing = fields.filter(([, value]) => !present(value)).map(([name]) => name);
+  const missing = LIVE_WEB_KEYS.filter(([key]) => !env[key]?.trim()).map(([, name]) => name);
   if (missing.length > 0) {
-    throw new Error(`Live Firebase is missing ${missing.join(", ")}.`);
+    throw new Error(
+      `Live Firebase is missing ${missing.join(", ")}. Put them in .env.local. They are not committed.`,
+    );
   }
-
   return {
-    apiKey: present(env.apiKey) ?? "",
-    authDomain: present(env.authDomain) ?? "",
+    apiKey: env.apiKey ?? "",
+    authDomain: env.authDomain ?? "",
     projectId: access.projectId,
-    storageBucket: present(env.storageBucket) ?? "",
-    messagingSenderId: present(env.messagingSenderId) ?? "",
-    appId: present(env.appId) ?? "",
+    storageBucket: env.storageBucket ?? "",
+    messagingSenderId: env.messagingSenderId ?? "",
+    appId: env.appId ?? "",
   };
 }
 
@@ -178,7 +120,6 @@ export function readClientEnv(): FirebaseClientEnv {
     dev: import.meta.env.DEV,
     prod: import.meta.env.PROD,
     useEmulators: import.meta.env.VITE_USE_FIREBASE_EMULATORS,
-    allowLive: import.meta.env.VITE_ALLOW_LIVE_FIREBASE,
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
     emulatorHost: import.meta.env.VITE_FIREBASE_EMULATOR_HOST,
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,

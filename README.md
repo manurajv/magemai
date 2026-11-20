@@ -8,15 +8,15 @@ Magemai is a multi-tenant platform for service businesses. Each business gets it
 
 ## Status
 
-Phase 1 step 5 (authentication and personal profiles) is in this repository. Email and password registration, sign-in, email verification, password reset, Google redirect, and the personal profile are implemented against the Firebase emulators. Onboarding, dashboard data, business switching, and super-admin behavior are not.
+Phase 1 step 6 (business onboarding) is in this repository. The app uses the live Firebase project `magemai` unless `VITE_USE_FIREBASE_EMULATORS` is `true`. Email and password registration, profiles, and the business wizard are implemented. Dashboard data, business switching, and super-admin behavior are not.
 
-Phase 2 and later (bookings, marketplace, finance, collaboration, subscriptions) stay out of scope until the Phase 1 acceptance criteria pass.
+Phase 2 and later stay out of scope until the Phase 1 acceptance criteria pass.
 
-No production domain is configured. Hosting, when it is deployed, uses the hostname Firebase assigns to the project. Nothing in this step deploys to `magemai` or enables billing. Real Google sign-in on the live project needs the owner to enable the provider and add the authorized domains in [docs/setup.md](docs/setup.md).
+Nothing in this change deploys to `magemai` or enables billing. The owner deploys from their PC with `deploy:rules`, `deploy:functions`, and `deploy:hosting`. The Storage bucket stays in `us-east1`. `stripDownloadTokens` deploys there; the other functions stay in `asia-south1`. See [docs/setup.md](docs/setup.md).
 
 ## Local development
 
-Node.js 24 LTS is recommended. Node.js 26 is supported for local development. Cloud Functions stay on the `nodejs24` runtime. JDK 21 is required for the emulators. The full Windows install is in [docs/setup.md](docs/setup.md).
+Node.js 24 LTS is recommended. Node.js 26 is supported. Cloud Functions stay on the `nodejs24` runtime. JDK 21 is needed only if you run the emulators. The Windows install is in [docs/setup.md](docs/setup.md).
 
 ```bash
 npm install
@@ -24,14 +24,7 @@ npm install --prefix functions
 npm run dev
 ```
 
-Emulators always use the demo project. In a second terminal:
-
-```bash
-npm run emulators:start
-npm run emulators:seed
-```
-
-`.firebaserc` names `demo-magemai` as the default project, so a Firebase CLI command without `--project` stays on the demo project. The live project is the alias `live` and has to be named explicitly. Emulator scripts still pass `--project demo-magemai` themselves.
+Put the public web config in gitignored `.env.local` and leave the emulator flag unset. `.firebaserc` defaults to `magemai`. The `demo` alias is `demo-magemai` for rules tests and `npm run test:e2e`.
 
 ## Documentation
 

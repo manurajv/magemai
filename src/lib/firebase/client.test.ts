@@ -1,11 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FUNCTIONS_REGION } from "@shared/firebase/region";
 import { createFirebase, getFirebase } from "@/lib/firebase/client";
-import {
-  LIVE_FIREBASE_BANNER,
-  LIVE_FLAG_IGNORED_WARNING,
-  type FirebaseClientEnv,
-} from "@/lib/firebase/env";
+import { type FirebaseClientEnv } from "@/lib/firebase/env";
 
 const calls = vi.hoisted(() => ({
   apps: [] as object[],
@@ -69,21 +65,17 @@ function resetFlags() {
   calls.connectFunctions = 0;
   calls.functionsRegion = "";
   globalThis.__magemaiEmulatorsConnected = undefined;
-  globalThis.__magemaiLiveWarningShown = undefined;
-  globalThis.__magemaiLiveFlagIgnoredShown = undefined;
 }
 
 const liveEnv: FirebaseClientEnv = {
   dev: true,
   prod: false,
-  useEmulators: "false",
-  allowLive: "true",
   projectId: "magemai",
   apiKey: "public-key",
-  authDomain: "magemai.firebaseapp.com",
-  storageBucket: "magemai.appspot.com",
-  messagingSenderId: "122706427013",
-  appId: "1:122706427013:web:demo",
+  authDomain: "example.firebaseapp.com",
+  storageBucket: "example.appspot.com",
+  messagingSenderId: "000",
+  appId: "1:000:web:demo",
 };
 
 describe("createFirebase", () => {
@@ -127,25 +119,11 @@ describe("createFirebase", () => {
     expect(calls.connectAuth).toHaveLength(0);
   });
 
-  it("warns once for live access and does not connect emulators", () => {
+  it("does not connect emulators for live access", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     createFirebase(liveEnv);
     createFirebase(liveEnv);
     expect(calls.connectAuth).toHaveLength(0);
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn).toHaveBeenCalledWith(LIVE_FIREBASE_BANNER);
-  });
-
-  it("warns that the live flag was ignored when emulators stay on", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    createFirebase({
-      dev: true,
-      prod: false,
-      useEmulators: "true",
-      allowLive: "true",
-      projectId: "demo-magemai",
-    });
-    expect(calls.connectAuth).toEqual(["http://127.0.0.1:9099"]);
-    expect(warn).toHaveBeenCalledWith(LIVE_FLAG_IGNORED_WARNING);
+    expect(warn).not.toHaveBeenCalled();
   });
 });

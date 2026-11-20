@@ -9,7 +9,7 @@ import { ForgotPasswordPage } from "@/app/pages/forgot-password-page";
 import { HomePage } from "@/app/pages/home-page";
 import { LoginPage } from "@/app/pages/login-page";
 import { NotFoundPage } from "@/app/pages/not-found-page";
-import { OnboardingPlaceholderPage } from "@/app/pages/onboarding-placeholder-page";
+import { OnboardingPage } from "@/app/pages/onboarding-page";
 import { ProfilePage } from "@/app/pages/profile-page";
 import { RegisterPage } from "@/app/pages/register-page";
 import { SuperAdminPage } from "@/app/pages/super-admin-page";
@@ -79,7 +79,7 @@ export const router = createBrowserRouter([
             element: <SuperAdminLayout />,
             children: [{ path: "/super-admin", element: <SuperAdminPage /> }],
           },
-          { path: "/business/register", element: <OnboardingPlaceholderPage /> },
+          { path: "/business/register", element: <OnboardingPage /> },
         ],
       },
       ...designSystemRoute,
