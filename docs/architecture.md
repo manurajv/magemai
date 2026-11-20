@@ -241,9 +241,8 @@ All callables require an authenticated user. Production deployments also require
 
 | Function | Caller | Effect |
 | --- | --- | --- |
-| `onAuthUserCreated` | Auth trigger | Creates the user document if missing. Forces `status: "active"`. Grants no claim. |
 | `guardProviderSignIn` | Auth blocking | Rejects a Google sign-in when that email already has a password provider. Does not link the accounts (OQ-7). Timeout is 7 seconds because Identity Platform caps blocking functions there. |
-| `syncAuthProfile` | That user | Copies `email` and `emailVerified` from the Auth record onto the user document and sets `lastLoginAt`. |
+| `syncAuthProfile` | That user | Creates `users/{uid}` when it is missing and copies `email` and `emailVerified` from the Auth record. Sets `lastLoginAt`. Idempotent. Grants no claim. |
 | `checkSlugAvailability` | Verified user | Returns `{ available: boolean }`. |
 | `createBusiness` | Verified user | Transaction: slug reservation, business, owner membership, audit. |
 | `updateBusinessProfile` | Owner, admin, manager | Profile field allow-list, audit. |
@@ -255,6 +254,8 @@ All callables require an authenticated user. Production deployments also require
 | `stripDownloadTokens` | Storage trigger in `us-east1` | Removes `firebaseStorageDownloadTokens` from every uploaded object. Its region is `STORAGE_REGION`, not the `asia-south1` default. |
 
 There is no callable that sets custom claims. Adding one would create a path the provisioning design exists to avoid.
+
+`syncAuthProfile` is the only profile-creation path. A 1st gen `onAuthUserCreated` trigger cannot use the `nodejs24` runtime (`Runtime "nodejs24" is not supported on GCF Gen1`). `beforeUserCreated` is not used, because a blocking Auth function needs Identity Platform. The client calls `syncAuthProfile` after sign-up and sign-in, and on app load when `users/{uid}` is missing. The callable writes with the Admin SDK inside a transaction. The client never writes `email`, `emailVerified`, `status`, `photoPath`, `createdAt`, or `lastLoginAt`.
 
 Error codes are Firebase `HttpsError` values: `unauthenticated`, `permission-denied`, `invalid-argument`, `already-exists`, `failed-precondition`, `resource-exhausted`, `internal`. The client shows a short message. Internal details stay in Functions logs.
 
@@ -285,8 +286,8 @@ Register (email/password) or Google redirect
         ▼
 Firebase Auth session
         │
-        ├─ onAuthUserCreated creates users/{uid} if needed
         ├─ client calls syncAuthProfile
+        │    creates users/{uid} if missing, then refreshes Auth-owned fields
         │
         ▼
 emailVerified on the ID token?
@@ -351,7 +352,7 @@ Every Phase 1 timestamp field below is a Firestore `Timestamp` written with `Fie
 | `status` | `"active"` or `"disabled"` | system | Created as `active`. Nothing in Phase 1 sets `disabled`. Functions still refuse a disabled user. |
 | `createdAt` | timestamp | system | Immutable. |
 | `updatedAt` | timestamp | owner or system | Client updates must equal `request.time`. |
-| `lastLoginAt` | timestamp or null | system | Set by `syncAuthProfile`. |
+| `lastLoginAt` | timestamp or null | system | Set by `syncAuthProfile`. Null only before the first successful sync. |
 
 **Ownership.** The person owns the profile. A business does not own it. Deleting a membership does not delete the user.
 
@@ -359,7 +360,7 @@ Every Phase 1 timestamp field below is a Firestore `Timestamp` written with `Fie
 
 - `get`: the user themselves, or an active platform admin (`isActivePlatformAdmin()` in section 15).
 - `list`: an active platform admin only. A normal user, and a revoked admin whose token still says `superAdmin`, cannot list the collection.
-- `create`: the user themselves, only when the document is missing, with `status == "active"`, email fields equal to the token, `photoPath == null`, `phoneNumber == null`, and no extra keys. This covers a delay of the Auth trigger. The trigger overwrites system fields if it runs afterwards.
+- `create`: denied. `syncAuthProfile` creates the document. Two overlapping calls use one transaction, so the second call updates Auth-owned fields and does not reset `displayName`, `phoneNumber`, `photoPath`, `locale`, `status`, or `createdAt`. If the stored display name is still empty or the placeholder `Member`, and Auth now has a name, that second call fills the name. The client retries the callable once when the error is `internal`, `unavailable`, `deadline-exceeded`, or `aborted`. A restored session calls it only when `users/{uid}` is missing. Sign-up, sign-in, and a verification reload always call it.
 - `update`: the user themselves, and only `displayName`, `phoneNumber`, `locale`, and `updatedAt`. `email`, `emailVerified`, `photoPath`, `status`, `createdAt`, and `lastLoginAt` stay unchanged on a client update. Any unknown field rejects the write.
 - `delete`: denied.
 
@@ -753,7 +754,7 @@ A member allow touches the membership document (`exists` plus `get`). A platform
 
 | Path | Client read | Client write |
 | --- | --- | --- |
-| `users/{uid}` | Self `get`, or active platform admin `get`/`list` | Self create under the strict shape in 8.2. Self update of the allow-list. |
+| `users/{uid}` | Self `get`, or active platform admin `get`/`list` | Create denied. Self update of the allow-list in 8.2. |
 | `businesses/{id}` | Active member `get`, or active platform admin `get`/`list` | Denied |
 | `businessMembers/{id}` | The shapes in 8.4 | Denied |
 | `businessSlugs/{slug}` | Denied | Denied |
@@ -1116,7 +1117,7 @@ There is one deploy target: project `magemai`. Firestore and Cloud Functions are
 1. In the console, enable the Email/Password provider. Create Firestore in `asia-south1` if it does not exist. Stop if it already exists in another region. Leave the default Storage bucket `magemai.firebasestorage.app` in `us-east1`. A function in `asia-south1` cannot listen to that bucket.
 2. Confirm Blaze and the budget alerts in section 22 before the first functions deploy. This document does not enable billing.
 3. `npm run deploy:rules` deploys Firestore rules, Firestore indexes, and Storage rules.
-4. `npm run deploy:functions` deploys functions. It does not deploy `guardProviderSignIn` unless `MAGEMAI_DEPLOY_BLOCKING_AUTH=true`.
+4. `npm run deploy:functions` deploys functions. `firebase.json` runs `npm --prefix "$RESOURCE_DIR" run build` before the upload, so a stale `functions/lib` is not what gets deployed. The runtime stays `nodejs24`. There is no 1st gen function. The next deploy deletes the old `onAuthUserCreated` trigger; confirm that deletion. `stripDownloadTokens` can fail once on a new `us-east1` deploy while the Eventarc service agent permissions propagate. Retry the same command. It does not deploy `guardProviderSignIn` unless `MAGEMAI_DEPLOY_BLOCKING_AUTH=true`.
 5. `npm run seed:platform-settings` writes `platformSettings/global`. It uses Application Default Credentials.
 6. `npm run deploy:hosting` builds the app and deploys Hosting. `.env.local` must be present and must not set the emulator flag.
 7. `npm run test:e2e:live`, then `npm run test:cleanup:live`. Live e2e fails until steps 3–5 have been deployed.
@@ -1537,7 +1538,7 @@ Step 4 adds these `package.json` scripts. Each name is invoked as `npm run <name
 | `test:cleanup:live` | `node scripts/cleanup-live-e2e.mjs` | Deletes only Auth users whose email starts with `e2e+` and their E2E businesses |
 | `seed:platform-settings` | `node scripts/seed-platform-settings.mjs` | `platformSettings/global` on the emulator or on live `magemai` |
 | `deploy:rules` | `firebase deploy --only firestore:rules,firestore:indexes,storage --project magemai` | Rules, indexes, and Storage rules |
-| `deploy:functions` | `firebase deploy --only functions --project magemai` | Functions, without the blocking Auth function |
+| `deploy:functions` | `firebase deploy --only functions --project magemai` | Compiles `functions` first, then deploys 2nd gen functions. No blocking Auth function and no 1st gen trigger. |
 | `deploy:hosting` | `npm run build && firebase deploy --only hosting --project magemai` | Production build, then Hosting |
 | `typecheck` | `tsc --noEmit -p tsconfig.json` and `tsc --noEmit -p functions/tsconfig.json` | Local files |
 | `lint` | `eslint .` | Local files |

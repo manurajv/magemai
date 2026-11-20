@@ -235,9 +235,20 @@ npm run test:e2e:live
 npm run test:cleanup:live
 ```
 
-`deploy:functions` publishes the callables in `asia-south1` and `stripDownloadTokens` in `us-east1`. The trigger has to share the bucket region. Deploying it in `asia-south1` fails with "A function in region asia-south1 cannot listen to a bucket in region us-east1".
+`deploy:functions` compiles `functions` before it uploads. `firebase.json` sets that predeploy to `npm --prefix "$RESOURCE_DIR" run build`. The Firebase CLI fills `RESOURCE_DIR` on Windows and on Linux, so a stale `functions/lib` is not deployed. The runtime stays `nodejs24`. Every function is 2nd gen. `onAuthUserCreated` is gone: Gen1 cannot run `nodejs24`. The next deploy asks to delete that old trigger. Confirm the deletion. Do not add `beforeUserCreated`.
+
+`deploy:functions` publishes the callables in `asia-south1` and `stripDownloadTokens` in `us-east1`. The trigger has to share the bucket region. Deploying it in `asia-south1` fails with "A function in region asia-south1 cannot listen to a bucket in region us-east1". The first deploy of that 2nd gen trigger can also fail while Eventarc service-agent permissions propagate. Wait a minute and run `npm run deploy:functions` again. No code change is required for that warning.
 
 `deploy:functions` does not publish `guardProviderSignIn`. That blocking function needs Identity Platform. Set `MAGEMAI_DEPLOY_BLOCKING_AUTH=true` in the same PowerShell window only after Identity Platform is enabled, then run `npm run deploy:functions` again. Until then, Google can attach to an existing password account.
+
+2nd gen functions store container images in Artifact Registry, in `asia-south1` and in `us-east1`. After the first functions deploy, set a one-day cleanup in both regions so old images do not accumulate:
+
+```powershell
+firebase functions:artifacts:setpolicy --location asia-south1 --days 1 --project magemai --force
+firebase functions:artifacts:setpolicy --location us-east1 --days 1 --project magemai --force
+```
+
+Run those once. A later deploy that warns about a missing cleanup policy means one of the two locations still needs the command.
 
 `seed:platform-settings` and the live cleanup use Application Default Credentials. In PowerShell, after `gcloud auth application-default login`, or with `GOOGLE_APPLICATION_CREDENTIALS` pointing at a service-account file that is not in the repository:
 
@@ -562,7 +573,9 @@ npm run seed:platform-settings
 npm run deploy:hosting
 ```
 
-`deploy:rules` publishes Firestore rules, the membership and creation indexes, and Storage rules. `deploy:functions` publishes the callables, including `createBusiness`, in `asia-south1`, and publishes `stripDownloadTokens` in `us-east1` so it can listen to `magemai.firebasestorage.app`. It leaves out the Identity Platform blocking function. `deploy:hosting` runs `npm run build` and publishes Hosting. `.firebaserc` already defaults to `magemai`. These scripts also pass `--project magemai`.
+`deploy:rules` publishes Firestore rules, the membership and creation indexes, and Storage rules. `deploy:functions` builds the functions package, then publishes the callables, including `createBusiness` and `syncAuthProfile`, in `asia-south1`, and publishes `stripDownloadTokens` in `us-east1` so it can listen to `magemai.firebasestorage.app`. It leaves out the Identity Platform blocking function and does not deploy a 1st gen Auth trigger. `deploy:hosting` runs `npm run build` and publishes Hosting. `.firebaserc` already defaults to `magemai`. These scripts also pass `--project magemai`.
+
+After that first functions deploy, set the Artifact Registry cleanup described in section 2.9 for `asia-south1` and `us-east1`.
 
 Then:
 

@@ -114,9 +114,9 @@ Maps to AC-1, AC-2, AC-3, AC-4, AC-9, AC-14, AC-15.
 - [x] `AuthProvider` uses `onAuthStateChanged` and `onIdTokenChanged`.
 - [x] Guards show the loading state while auth is resolving, then redirect. They do not flash protected content.
 - [x] Sign-out clears the session and the `magemai.activeBusinessId` hint.
-- [x] Auth trigger `onAuthUserCreated` creates `users/{uid}` with `status: "active"` and no claim.
-- [x] Client create of `users/{uid}` is restricted to the shape in architecture section 8.2, so a delayed trigger cannot be used to add fields.
-- [x] `syncAuthProfile` copies `email` and `emailVerified` from the Auth record and sets `lastLoginAt`.
+- [x] `syncAuthProfile` creates `users/{uid}` with `status: "active"` and no claim, then copies `email` and `emailVerified` and sets `lastLoginAt`. There is no 1st gen Auth trigger and no `beforeUserCreated` function.
+- [x] Client create of `users/{uid}` is denied. The client cannot write `email`, `emailVerified`, `status`, `photoPath`, `createdAt`, or `lastLoginAt`.
+- [x] The client calls `syncAuthProfile` after sign-up and sign-in, and on app load when the profile document is missing. A second call does not reset owner-edited profile fields.
 - [x] Profile screen updates only display name, phone, and locale. Phone is optional E.164.
 - [x] Avatar upload goes to `users/{uid}/avatar` and is linked by `setUserAvatar`. The screen reads bytes with `getBlob`, not `getDownloadURL`.
 - [x] Form validation and error messages for bad email, short password, and bad phone (AC-14).

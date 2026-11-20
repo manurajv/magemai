@@ -96,12 +96,16 @@ describe("user profile rules", () => {
     });
   }
 
-  it("lets a person create and read their own profile, and update the allow-list", async () => {
+  it("denies client creation and lets the owner update the allow-list", async () => {
     const context = alice();
     const db = context.firestore() as unknown as Firestore;
-    await assertSucceeds(
+    await assertFails(
       setDoc(doc(db, "users/alice"), profile("alice", "alice@example.test", false)),
     );
+    await testEnv.withSecurityRulesDisabled(async (unrestricted) => {
+      const adminDb = unrestricted.firestore() as unknown as Firestore;
+      await setDoc(doc(adminDb, "users/alice"), profile("alice", "alice@example.test", false));
+    });
     await assertSucceeds(getDoc(doc(db, "users/alice")));
     await assertSucceeds(
       updateDoc(doc(db, "users/alice"), {

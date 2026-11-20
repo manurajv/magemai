@@ -7,7 +7,7 @@ import {
   type User,
 } from "firebase/auth";
 import { AuthContext, type AuthContextValue, type AuthUser } from "@/app/providers/auth-context";
-import { bootstrapAuthUser, clearActiveBusinessHint } from "@/lib/auth/session";
+import { bootstrapAuthUser, clearActiveBusinessHint, profileSyncReason } from "@/lib/auth/session";
 import { mapAuthError } from "@/lib/auth/errors";
 import { getFirebase } from "@/lib/firebase/client";
 
@@ -27,13 +27,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [redirectError, setRedirectError] = useState<string | null>(null);
   const bootstrapped = useRef(new Set<string>());
   const redirectStarted = useRef(false);
+  const pageStartedAt = useRef(Date.now());
 
   const applyUser = useCallback((next: User | null) => {
     setUser(toAuthUser(next));
     setStatus("ready");
     if (!next || bootstrapped.current.has(next.uid)) return;
     bootstrapped.current.add(next.uid);
-    void bootstrapAuthUser(next).catch((error: unknown) => {
+    const reason = profileSyncReason(next.metadata.lastSignInTime, pageStartedAt.current);
+    void bootstrapAuthUser(next, reason).catch((error: unknown) => {
       bootstrapped.current.delete(next.uid);
       console.error(error);
     });
@@ -72,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await current.reload();
         await current.getIdToken(true);
         bootstrapped.current.delete(current.uid);
-        await bootstrapAuthUser(current);
+        await bootstrapAuthUser(current, "sign-in");
         bootstrapped.current.add(current.uid);
         applyUser(current);
         return current.emailVerified;

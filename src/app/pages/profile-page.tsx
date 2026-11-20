@@ -99,7 +99,7 @@ export function ProfilePage() {
             void profileQuery.refetch();
             return;
           }
-          void bootstrapAuthUser(current).finally(() => void profileQuery.refetch());
+          void bootstrapAuthUser(current, "sign-in").finally(() => void profileQuery.refetch());
         }}
       />
     );

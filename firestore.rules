@@ -16,35 +16,6 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)).data.status == 'active';
     }
 
-    function userCreateShape(uid) {
-      return request.resource.data.keys().hasOnly([
-          'id',
-          'email',
-          'emailVerified',
-          'displayName',
-          'phoneNumber',
-          'photoPath',
-          'locale',
-          'status',
-          'createdAt',
-          'updatedAt',
-          'lastLoginAt'
-        ])
-        && request.resource.data.id == uid
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.emailVerified == request.auth.token.email_verified
-        && request.resource.data.status == 'active'
-        && request.resource.data.photoPath == null
-        && request.resource.data.phoneNumber == null
-        && request.resource.data.locale == 'en'
-        && request.resource.data.displayName is string
-        && request.resource.data.displayName.size() >= 1
-        && request.resource.data.displayName.size() <= 80
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.updatedAt == request.time
-        && request.resource.data.lastLoginAt == null;
-    }
-
     function userUpdateAllowed() {
       return request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['displayName', 'phoneNumber', 'locale', 'updatedAt'])
@@ -75,12 +46,12 @@ service cloud.firestore {
         && get(memberPath(businessId)).data.role in ['owner', 'admin', 'manager'];
     }
 
-    // Profiles stay client-writable on the allow-list. Business records are
-    // written only by callables. businessSlugs and auditLogs stay deny-all.
+    // Profile creation is the syncAuthProfile callable. Clients may update
+    // only the allow-list. Business records, slugs, and audit logs stay deny-all.
     match /users/{uid} {
       allow get: if isSelf(uid) || isActivePlatformAdmin();
       allow list: if isActivePlatformAdmin();
-      allow create: if isSelf(uid) && userCreateShape(uid);
+      allow create: if false;
       allow update: if isSelf(uid) && userUpdateAllowed();
       allow delete: if false;
     }

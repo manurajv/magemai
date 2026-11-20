@@ -4,7 +4,7 @@ import { beforeUserSignedIn } from "firebase-functions/v2/identity";
 import { rejectCrossProvider } from "./provider-guard.js";
 
 export { checkSlugAvailability, createBusiness, setBusinessImage } from "./business.js";
-export { onAuthUserCreated, setUserAvatar, stripDownloadTokens, syncAuthProfile } from "./users.js";
+export { setUserAvatar, stripDownloadTokens, syncAuthProfile } from "./users.js";
 
 /**
  * Blocking sign-in functions need Identity Platform, so a normal deploy omits
