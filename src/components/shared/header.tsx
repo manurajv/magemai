@@ -1,4 +1,6 @@
 import { Menu } from "lucide-react";
+import { useNavigate } from "react-router";
+import { useAuth } from "@/app/providers/auth-context";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu } from "@/components/ui/dropdown-menu";
@@ -8,6 +10,15 @@ type HeaderProps = {
 };
 
 export function Header({ onOpenSidebar }: HeaderProps) {
+  const auth = useAuth();
+  const navigate = useNavigate();
+  const items = auth.user
+    ? [
+        { label: "Profile", onSelect: () => navigate("/profile") },
+        { label: "Sign out", onSelect: () => void auth.signOut() },
+      ]
+    : [{ label: "Sign in", onSelect: () => navigate("/login") }];
+
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-card px-4 md:px-6">
       <Button
@@ -42,10 +53,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
               Account
             </Button>
           }
-          items={[
-            { label: "Profile (not yet implemented)", disabled: true },
-            { label: "Sign out (not yet implemented)", disabled: true },
-          ]}
+          items={items}
         />
       </div>
     </header>

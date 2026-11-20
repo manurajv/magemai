@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { ensureVerifiedUser } from "./emulator-user";
 
 test("home names Magemai and the emulator project", async ({ page }) => {
   await page.goto("/");
@@ -11,18 +12,24 @@ test("home names Magemai and the emulator project", async ({ page }) => {
   await expect(page.getByText(/Auth emulator is reachable at 127\.0\.0\.1:9099/)).toBeVisible();
 });
 
-test("auth placeholders are labelled as not implemented", async ({ page }) => {
+test("sign-in and registration forms are available", async ({ page }) => {
   await page.goto("/login");
   await expect(page).toHaveTitle("Sign in · Magemai");
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
-  await expect(page.getByText(/not yet implemented/i)).toBeVisible();
+  await expect(page.getByLabel("Email")).toBeVisible();
   await page.goto("/register");
   await expect(page.getByRole("heading", { name: "Create account" })).toBeVisible();
-  await expect(page.getByText(/not yet implemented/i)).toBeVisible();
+  await expect(page.getByLabel("Your name")).toBeVisible();
 });
 
 test("admin shell marks future sections coming soon", async ({ page }, testInfo) => {
-  await page.goto("/admin");
+  const email = `shell.${testInfo.project.name}@example.test`;
+  await ensureVerifiedUser(email, "emupass-not-for-live", "Shell User");
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("emupass-not-for-live");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   await expect(page).toHaveTitle("Dashboard · Magemai");
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   const open = page.getByTestId("open-sidebar");

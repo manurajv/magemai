@@ -13,13 +13,20 @@ const PASSWORD = "emupass-not-for-live";
 const PILOT_NAME = "beyond gravity";
 
 const USERS = [
-  { email: "owner.a@example.test", displayName: "Owner A", claims: {} },
-  { email: "owner.b@example.test", displayName: "Owner B", claims: {} },
-  { email: "staff.a@example.test", displayName: "Staff A", claims: {} },
+  { email: "owner.a@example.test", displayName: "Owner A", claims: {}, emailVerified: true },
+  { email: "owner.b@example.test", displayName: "Owner B", claims: {}, emailVerified: true },
+  { email: "staff.a@example.test", displayName: "Staff A", claims: {}, emailVerified: true },
   {
     email: "platform.admin@example.test",
     displayName: "Platform Admin",
     claims: { superAdmin: true },
+    emailVerified: true,
+  },
+  {
+    email: "unverified.a@example.test",
+    displayName: "Unverified A",
+    claims: {},
+    emailVerified: false,
   },
 ];
 
@@ -91,9 +98,13 @@ async function ensureUser(auth, db, user) {
       email: user.email,
       password: PASSWORD,
       displayName: user.displayName,
-      emailVerified: true,
+      emailVerified: user.emailVerified,
     });
   }
+  await auth.updateUser(record.uid, {
+    emailVerified: user.emailVerified,
+    displayName: user.displayName,
+  });
   await auth.setCustomUserClaims(record.uid, user.claims);
   const ref = db.doc(`users/${record.uid}`);
   const existing = await ref.get();
@@ -101,7 +112,7 @@ async function ensureUser(auth, db, user) {
     await ref.set({
       id: record.uid,
       email: user.email,
-      emailVerified: true,
+      emailVerified: user.emailVerified,
       displayName: user.displayName,
       phoneNumber: null,
       photoPath: null,
@@ -111,6 +122,8 @@ async function ensureUser(auth, db, user) {
       updatedAt: FieldValue.serverTimestamp(),
       lastLoginAt: null,
     });
+  } else {
+    await ref.set({ emailVerified: user.emailVerified }, { merge: true });
   }
   return record.uid;
 }
