@@ -99,6 +99,7 @@ test("register, verify, profile, logout, and password reset", async ({
   await expect(page.getByRole("heading", { name: "Create a business" })).toBeVisible();
   await page.getByRole("button", { name: "Account" }).click();
   await page.getByRole("menuitem", { name: "Sign out" }).click();
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 
   await page.goto("/forgot-password");
   await expect(page.getByRole("heading", { name: "Reset password" })).toBeVisible();

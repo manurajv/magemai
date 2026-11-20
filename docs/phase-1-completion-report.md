@@ -142,6 +142,8 @@ Commands run on this machine:
 
 The first full Playwright run reported 27 passed, 2 failed, and 16 skipped. The failures were the Google emulator account list (the email field is hidden until "Add new account") and a strict-mode locator that matched "Owner" in both the switcher and the dashboard. Both were test fixes. The confirming `npm run test:e2e` then reported 29 passed and 16 skipped.
 
+The first GitHub Actions run of `npm run test:all` failed the same desktop auth test at the password-reset step. Sign-out had not finished, so `/forgot-password` still saw a signed-in session and the guest route sent the browser to `/admin`. The test now waits for the Sign in heading before opening that page. A desktop re-run of `tests/e2e/auth.spec.ts` passed 2 tests. The rest of the suite was not re-run for that one-line wait.
+
 Not run:
 
 - `npm run test:e2e:live` and `npm run test:cleanup:live`. They talk to project `magemai`.
