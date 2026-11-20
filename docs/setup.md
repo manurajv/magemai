@@ -4,9 +4,9 @@
 **Endorsement:** A Mavixas product  
 **Tagline:** Your business. Your own space.
 
-This guide is for local development against the Emulator Suite, and for the one cloud project the owner already has. Step 4 has added the Vite app, the design system, and the emulator scripts. `scripts/provision-super-admin.ts` and `npm run seed:platform-settings` are still later checklist steps. The contracts those commands must meet are in [architecture.md](./architecture.md).
+Day-to-day development uses the live Firebase project `magemai`. Emulators are optional and are required only for rules tests and for `npm run test:e2e`. The policy is [Live Firebase by default](./architecture.md#24-live-firebase-by-default). There is no separate dev or staging project.
 
-Do not deploy to `magemai` until the owner explicitly says so. Local work and automated tests use the Emulator Suite (`demo-magemai`) and do not need a paid Firebase plan. There is no separate dev or staging project. The mandatory rules are [Firebase Emulator-First Development Policy](./architecture.md#24-firebase-emulator-first-development-policy) in the architecture. Windows setup is section 2 of this guide. The commands in that policy are the step 4 contract. They do not work until that step lands.
+Windows setup is section 2. You do not need the JDK or the emulators to sign in and create a business.
 
 ## 1. Prerequisites
 
@@ -176,18 +176,36 @@ npm run emulators:start
 
 `emulator-data\` is gitignored. Do not force-add it. Synthetic data is recreated with the seed, not by committing an export.
 
-### 2.7 Seed synthetic data and start the app
+### 2.7 Sign in against the live project
 
-With the emulators running, in a second window:
+Create `.env.local` in the repository root. It is gitignored. Put the public web config there and leave `VITE_USE_FIREBASE_EMULATORS` unset:
+
+```text
+VITE_FIREBASE_API_KEY=<from the Firebase console>
+VITE_FIREBASE_AUTH_DOMAIN=magemai.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=magemai
+VITE_FIREBASE_STORAGE_BUCKET=magemai.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=122706427013
+VITE_FIREBASE_APP_ID=1:122706427013:web:1a378bc69df68f37bc3dec
+```
+
+The API key is also a public client value. Copy it from the console. Do not commit this file.
+
+In the Firebase console, before the first sign-in:
+
+1. Authentication → Sign-in method → enable Email/Password.
+2. Firestore → create the database in `asia-south1` if it does not exist. If it already exists in another region, stop and do not create a second database.
+3. Storage should already be the bucket named above.
+
+Then:
 
 ```powershell
-npm run emulators:seed
 npm run dev
 ```
 
-`emulators:seed` writes only the synthetic users and businesses in architecture section 24.9 (the `.test` emails and "Test Studio A" / "Test Studio B"), plus `platformSettings/global` from `shared/platform/defaults.ts` and one idempotent audit row. It does not create the pilot business. The Admin SDK may print a metadata-server warning on a PC that is not a Google Compute Engine VM. The seed sets `METADATA_SERVER_DETECTION=none` before it writes so that lookup is skipped. `npm run dev` starts Vite at http://127.0.0.1:5173, and the app connects to `127.0.0.1` on the ports above.
+Open http://127.0.0.1:5173/register, create an account, and open the verification email. After you verify, sign in and open http://127.0.0.1:5173/business/register. Creating a business needs the rules, functions, and platform settings deployed (section 11).
 
-Sign in as `owner.a@example.test` with password `emupass-not-for-live`. That password is created only in the Auth emulator. The same password is on `owner.b@example.test`, `staff.a@example.test`, `platform.admin@example.test`, and `unverified.a@example.test`. `unverified.a@example.test` has `emailVerified: false` and no business, so the app keeps that account on `/verify-email`. The other four seed users are verified. Do not reuse this password on the live project.
+The emulator seed in section 6 is optional. Its password `emupass-not-for-live` exists only in the Auth emulator. Do not reuse it on the live project.
 
 ### 2.8 Tests, types, and lint
 
@@ -200,13 +218,32 @@ npm run lint
 npm run format
 ```
 
-`test:rules` and `test:e2e` go through `node scripts/emulators.mjs exec`, which runs `firebase emulators:exec --project demo-magemai`. If the project id were `magemai`, or an emulator host were missing, the script exits before any test. None of these commands deploys or deletes cloud data.
+`npm test` does not need the emulators. `test:rules` and `test:e2e` start the Emulator Suite as `demo-magemai` and refuse a non-local host. They do not deploy.
 
-At step 4, `npm run test:rules` checks that the emulator hosts are local. The security-rule cases in architecture section 20.4 arrive in step 9. `npm run test:e2e` is a smoke pass of the shell at desktop (1280×800), tablet (768×1024), and mobile (390×844). The register and onboarding flows arrive in step 10. `npm run preview` serves the production build with `vite preview`. There is still no `deploy` script.
+`npm run test:e2e:live` talks to project `magemai`. It fails until section 11 has been deployed. `npm run test:cleanup:live` deletes only users whose email starts with `e2e+`.
 
-### 2.9 Live project access and deploy
+### 2.9 Deploy from this PC
 
-Do not point day-to-day development at `magemai`. The only local exception is the opt-in in architecture section 24.6, using a gitignored `.env.development.local` with `VITE_ALLOW_LIVE_FIREBASE=true` and `VITE_USE_FIREBASE_EMULATORS=false`. The app then shows a banner that writes go to the real project. Automated tests refuse to run in that mode.
+Deploy only after Email/Password is enabled, Firestore exists in `asia-south1`, and Blaze plus the budget alerts in section 8 are in place. The commands do not ask you to type the project id. They always pass `--project magemai`. CI does not run them.
+
+```powershell
+npm run deploy:rules
+npm run deploy:functions
+npm run seed:platform-settings
+npm run deploy:hosting
+npm run test:e2e:live
+npm run test:cleanup:live
+```
+
+`deploy:functions` does not publish `guardProviderSignIn`. That blocking function needs Identity Platform. Set `MAGEMAI_DEPLOY_BLOCKING_AUTH=true` in the same PowerShell window only after Identity Platform is enabled, then run `npm run deploy:functions` again. Until then, Google can attach to an existing password account.
+
+`seed:platform-settings` and the live cleanup use Application Default Credentials. In PowerShell, after `gcloud auth application-default login`, or with `GOOGLE_APPLICATION_CREDENTIALS` pointing at a service-account file that is not in the repository:
+
+```powershell
+npm run seed:platform-settings
+```
+
+`deploy:hosting` reads `.env.local`. Leave the emulator flag unset. Live e2e will not pass before the rules, functions, and platform settings exist.
 
 There is no `npm run deploy`. A deploy happens only after the owner explicitly approves it, using section 11, and only after you type the project id and the project number.
 
@@ -502,37 +539,39 @@ Sign in at `/login` with that email. The super-admin area is `/super-admin`. A u
 
 ## 10. Local app
 
-Start the emulators first (`npm run emulators:start`), then in a second window:
+With `.env.local` in place (section 2.7):
 
 ```text
 npm run dev
 ```
 
-The Vite URL is printed in the terminal, usually http://127.0.0.1:5173. The app connects to the emulators on `127.0.0.1`. Create an account on `/register`. The app stays on `/verify-email` until the address is verified. Copy the emulator out-of-band code onto `/auth/action` (section 5), then choose "I've verified". The personal profile is `/profile`. `/business/register` is only a placeholder until the onboarding step. For a repeatable set of users, run `npm run emulators:seed` instead of registering by hand (section 2.7).
+The Vite URL is http://127.0.0.1:5173. The app uses project `magemai`. Create an account on `/register`, verify the email from the real inbox, then sign in. The personal profile is `/profile`. `/business/register` is the onboarding wizard. It needs the deploy in section 11 and `npm run seed:platform-settings` before a business can be saved. After a successful create, the app stores `magemai.activeBusinessId` and opens `/admin`. The business switcher is a later step.
 
 Create businesses through that wizard. Do not add a hard-coded tenant.
 
 ## 11. Deploy
 
-Not part of normal setup, and not part of the test commands. Deploy only after the owner has explicitly said to deploy, Blaze is on, and the budget alerts in section 8 are in place.
+Run these from PowerShell after section 2.9's console steps. Order matters: rules, then functions, then platform settings, then hosting.
 
-Build first, so the bundle talks to `magemai` and not to the emulators:
-
-```bash
-npm run build -- --mode production
+```powershell
+npm run deploy:rules
+npm run deploy:functions
+npm run seed:platform-settings
+npm run deploy:hosting
 ```
 
-Then deploy. The command must print project id `magemai` and project number `122706427013` and wait until the operator types both. A wrapper added in the checklist does that before it invokes the CLI:
+`deploy:rules` publishes Firestore rules, the membership and creation indexes, and Storage rules. `deploy:functions` publishes the callables, including `createBusiness`, and leaves out the Identity Platform blocking function. `deploy:hosting` runs `npm run build` and publishes Hosting. `.firebaserc` already defaults to `magemai`. These scripts also pass `--project magemai`.
 
-```bash
-firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting --project live
+Then:
+
+```powershell
+npm run test:e2e:live
+npm run test:cleanup:live
 ```
 
-`--project magemai` is the same target. A command that omits `--project` uses the `.firebaserc` default, `demo-magemai`, and does not deploy the live project.
+Live e2e registers `e2e+<timestamp>@e2e.magemai.test` with a display name starting `E2E `, marks that user verified with Application Default Credentials, and creates one business. Cleanup deletes only those `e2e+` users, their user documents, their memberships, and businesses whose names start with `E2E `. Audit rows are left in place. Both commands fail if the emulator hosts are set. Neither is run by CI.
 
-There is no staging project to deploy to first. This setup guide does not authorize the deploy. Do not aim a test command at `magemai`.
-
-Hosting answers on `magemai.web.app` and `magemai.firebaseapp.com`. Add those hostnames to Authentication → Authorized domains if Firebase has not added them automatically. Do not attach a custom domain.
+Hosting answers on `magemai.web.app` and `magemai.firebaseapp.com`. Add `localhost`, `127.0.0.1`, and those two hostnames to Authentication → Authorized domains if they are missing. Do not attach a custom domain. Google sign-in, email enumeration protection, and App Check stay console tasks and are not done by these scripts.
 
 ## 12. What not to commit
 

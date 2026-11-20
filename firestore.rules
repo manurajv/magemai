@@ -59,14 +59,58 @@ service cloud.firestore {
         && request.resource.data.locale == 'en';
     }
 
-    // Step 5: the signed-in person can read and update their own profile.
-    // Every other collection stays deny-all until step 9.
+    function memberPath(businessId) {
+      return /databases/$(database)/documents/businessMembers/$(businessId + '_' + request.auth.uid);
+    }
+
+    function isActiveMember(businessId) {
+      return isSignedIn()
+        && exists(memberPath(businessId))
+        && get(memberPath(businessId)).data.status == 'active'
+        && get(memberPath(businessId)).data.userId == request.auth.uid;
+    }
+
+    function isActiveManager(businessId) {
+      return isActiveMember(businessId)
+        && get(memberPath(businessId)).data.role in ['owner', 'admin', 'manager'];
+    }
+
+    // Profiles stay client-writable on the allow-list. Business records are
+    // written only by callables. businessSlugs and auditLogs stay deny-all.
     match /users/{uid} {
       allow get: if isSelf(uid) || isActivePlatformAdmin();
       allow list: if isActivePlatformAdmin();
       allow create: if isSelf(uid) && userCreateShape(uid);
       allow update: if isSelf(uid) && userUpdateAllowed();
       allow delete: if false;
+    }
+
+    match /platformSettings/{id} {
+      allow get: if isSignedIn() && (id == 'global' || isActivePlatformAdmin());
+      allow list: if isActivePlatformAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /businesses/{businessId} {
+      allow get: if isActiveMember(businessId) || isActivePlatformAdmin();
+      allow list: if isActivePlatformAdmin();
+      allow create, update, delete: if false;
+    }
+
+    // A manager list filtered by businessId is intentionally omitted.
+    // That query depends on resource data inside get(), which the rules
+    // language rejects. Step 6 does not need a staff directory.
+    match /businessMembers/{memberId} {
+      allow get: if isSignedIn() && (
+        resource.data.userId == request.auth.uid
+        || isActivePlatformAdmin()
+        || isActiveManager(resource.data.businessId)
+      );
+      allow list: if isSignedIn() && (
+        resource.data.userId == request.auth.uid
+        || isActivePlatformAdmin()
+      );
+      allow create, update, delete: if false;
     }
 
     match /{document=**} {

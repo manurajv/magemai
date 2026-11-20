@@ -31,7 +31,8 @@
     "vite.config.ts",
     "vitest.config.ts",
     "vitest.rules.config.ts",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "playwright.live.config.ts"
   ],
   "exclude": ["functions", "node_modules", "dist", "coverage", "emulator-data"]
 }

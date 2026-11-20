@@ -6,7 +6,7 @@
 
 This checklist is workflow steps 4–12 from the product owner's instructions. Steps 1–3 (inspect the repository, write the architecture, write these docs) are the planning pass that produced [architecture.md](./architecture.md), [setup.md](./setup.md), and [magemai-blueprint.md](./magemai-blueprint.md).
 
-The owner approved the architecture direction and locked four decisions: `asia-south1`, integer minor units with ISO 4217 codes, platform root collections plus business subcollections for later operational data, and Firebase-assigned `web.app` / `firebaseapp.com` hostnames only. Implement those unchanged. The only cloud project is `magemai` (number `122706427013`). Local development and automated tests use the Emulator Suite (`demo-magemai`), and that stays the workflow after commercial launch. Do not create a dev or staging project. Implement the other proposed defaults in the architecture, including the `platformAdmins` registry and the emulator-first policy in architecture section 24. Do not start Phase 2 from this list. Do not seed or special-case the pilot business named in the blueprint.
+The owner approved the architecture direction and locked four decisions: `asia-south1`, integer minor units with ISO 4217 codes, platform root collections plus business subcollections for later operational data, and Firebase-assigned `web.app` / `firebaseapp.com` hostnames only. Implement those unchanged. The only cloud project is `magemai` (number `122706427013`). On 2026-11-20 the app default changed from emulator-first to that live project. Rules tests and `npm run test:e2e` still use the Emulator Suite (`demo-magemai`). Do not create a dev or staging project. Do not start Phase 2 from this list. Do not seed or special-case the pilot business named in the blueprint. The earlier step 4 boxes that describe the old emulator default are the historical record of that step. Section 24 of the architecture is the current policy.
 
 ## How to check a box
 
@@ -130,29 +130,29 @@ The AC-1 through AC-18 tracker stays open. Those boxes also depend on later step
 
 Maps to AC-5, AC-6, AC-7, AC-14, AC-15.
 
-- [ ] Seed script `scripts/seed-platform-settings.ts`, wired as `npm run seed:platform-settings`, writes `platformSettings/global` from `shared/platform/defaults.ts` and an audit row `platform_settings.seed`.
-- [ ] Defaults match the architecture: country `LK`, currency `LKR`, language `en`, timezone `Asia/Colombo`, the category ids, the currency list, and the reserved slugs.
-- [ ] No seed, fixture, or reserved slug names the pilot business.
-- [ ] Zod schemas for all seven wizard steps, shared with the function.
-- [ ] `/business/register` wizard: identity, description, contact, location, locale, optional images, review.
-- [ ] Slug suggestion from ASCII letters in the name. Unicode names remain valid. Empty suggestion when the name has no ASCII letters (OQ-14).
-- [ ] `checkSlugAvailability` used on blur and before leaving the identity step.
-- [ ] Contact email required. Phone and website optional (OQ-12).
-- [ ] Country, currency, language, and timezone pre-selected from platform settings and editable.
-- [ ] `shared/data/countries.ts` is the ISO 3166-1 alpha-2 list the country control and the Zod schema both use. `supportedCountries` only pins entries to the top.
-- [ ] Server rejects a timezone `Intl` does not know, a currency outside the settings list, and a country code outside `shared/data/countries.ts`.
-- [ ] Display name, when missing, is collected and saved on the user document before submit (OQ-18).
-- [ ] `createBusiness` transaction: slug reservation, business document, owner membership id `{businessId}_{uid}`, audit `business.create`.
-- [ ] Payload role, status, owner id, and verification are ignored (XT-20).
-- [ ] Stored result: role `owner`, `status: "active"`, `verificationStatus: "unverified"`, `bookingApprovalMode: "manual"`, `publicProfileEnabled: false` (OQ-4, AC-6).
-- [ ] Idempotent retry for the same user and the same slug. Second user gets `already-exists`.
-- [ ] Caps: 10 creations per rolling 24 hours and 25 owner memberships (OQ-13).
-- [ ] Logo and cover are skippable (OQ-6). When present, they upload to the fixed brand paths and `setBusinessImage` links them.
-- [ ] After success, the new membership becomes the active business and the app opens `/admin`.
-- [ ] A second run of the wizard creates a second owner membership (AC-7).
-- [ ] Direct client writes to `businesses`, `businessMembers`, and `businessSlugs` remain denied.
-- [ ] Component tests for the wizard validation and the review step.
-- [ ] Emulator test XT-20.
+- [x] Seed script `scripts/seed-platform-settings.mjs`, wired as `npm run seed:platform-settings`, writes `platformSettings/global` from `shared/platform/defaults.ts` and an audit row `platform_settings.seed`. The emulator path was run. The live path was not run from this environment.
+- [x] Defaults match the architecture: country `LK`, currency `LKR`, language `en`, timezone `Asia/Colombo`, the category ids, the currency list, and the reserved slugs.
+- [x] No seed, fixture, or reserved slug names the pilot business.
+- [x] Zod schemas for all seven wizard steps, shared with the function.
+- [x] `/business/register` wizard: identity, description, contact, location, locale, optional images, review.
+- [x] Slug suggestion from ASCII letters in the name. Unicode names remain valid. Empty suggestion when the name has no ASCII letters (OQ-14).
+- [x] `checkSlugAvailability` used on blur and before leaving the identity step.
+- [x] Contact email required. Phone and website optional (OQ-12).
+- [x] Country, currency, language, and timezone pre-selected from platform settings and editable.
+- [x] `shared/data/countries.ts` is the ISO 3166-1 alpha-2 list the country control and the Zod schema both use. `supportedCountries` only pins entries to the top.
+- [x] Server rejects a timezone `Intl` does not know, a currency outside the settings list, and a country code outside `shared/data/countries.ts`.
+- [x] Display name, when missing, is collected and saved on the user document before submit (OQ-18). The placeholder name `Member` counts as missing.
+- [x] `createBusiness` transaction: slug reservation, business document, owner membership id `{businessId}_{uid}`, audit `business.create`.
+- [x] Payload role, status, owner id, and verification are ignored (XT-20).
+- [x] Stored result: role `owner`, `status: "active"`, `verificationStatus: "unverified"`, `bookingApprovalMode: "manual"`, `publicProfileEnabled: false` (OQ-4, AC-6).
+- [x] Idempotent retry for the same user and the same slug. Second user gets `already-exists`.
+- [x] Caps: 10 creations per rolling 24 hours and 25 owner memberships (OQ-13).
+- [x] Logo and cover are skippable (OQ-6). When present, they upload to the fixed brand paths and `setBusinessImage` links them. The emulator onboarding run skipped both images. Rules tests cover the owner upload and the staff denial.
+- [x] After success, `magemai.activeBusinessId` is set to the new business and the app opens `/admin`. Loading memberships and the switcher stay in step 7.
+- [x] A second run of the wizard creates a second owner membership (AC-7).
+- [x] Direct client writes to `businesses`, `businessMembers`, and `businessSlugs` remain denied.
+- [x] Component tests for the wizard validation and the review step.
+- [x] Emulator test XT-20.
 
 ## Step 7 — Dashboard and switching
 

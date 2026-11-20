@@ -49,12 +49,12 @@ export function HomePage() {
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">{brand.name}</h1>
         <p className="mt-3 max-w-xl text-lg text-primary-foreground/80">{brand.tagline}</p>
       </section>
-      <NotImplementedNotice what="Accounts and onboarding" />
+      <NotImplementedNotice what="The business dashboard" />
       <Card>
         <CardHeader>
-          <CardTitle>Local Firebase</CardTitle>
+          <CardTitle>Firebase</CardTitle>
           <CardDescription>
-            Development connects to the emulator suite unless live access is explicitly opted in.
+            The app uses the live Firebase project unless the emulator flag is turned on.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 text-sm">

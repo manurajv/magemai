@@ -21,9 +21,11 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
   type Firestore,
 } from "firebase/firestore";
 import { getBytes, ref, uploadString, type FirebaseStorage } from "firebase/storage";
@@ -199,6 +201,91 @@ describe("user profile rules", () => {
         contentType: "image/png",
       }),
     );
+  });
+
+  it("lets an owner read the business and upload a logo, and denies everyone else", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore() as unknown as Firestore;
+      await setDoc(doc(db, "platformSettings/global"), { id: "global", defaultCountry: "LK" });
+      await setDoc(doc(db, "businesses/studio"), {
+        id: "studio",
+        ownerId: "owner",
+        status: "active",
+      });
+      await setDoc(doc(db, "businessMembers/studio_owner"), {
+        id: "studio_owner",
+        businessId: "studio",
+        userId: "owner",
+        role: "owner",
+        status: "active",
+      });
+      await setDoc(doc(db, "businessMembers/studio_staff"), {
+        id: "studio_staff",
+        businessId: "studio",
+        userId: "staff",
+        role: "staff",
+        status: "active",
+      });
+    });
+    const owner = testEnv
+      .authenticatedContext("owner", { email: "owner@example.test", email_verified: true })
+      .firestore() as unknown as Firestore;
+    await assertSucceeds(getDoc(doc(owner, "businesses/studio")));
+    await assertSucceeds(getDoc(doc(owner, "platformSettings/global")));
+    await assertSucceeds(
+      getDocs(query(collection(owner, "businessMembers"), where("userId", "==", "owner"))),
+    );
+    await assertFails(setDoc(doc(owner, "businesses/other"), { name: "Direct write" }));
+    await assertFails(setDoc(doc(owner, "businessMembers/studio_owner"), { role: "staff" }));
+    await assertFails(setDoc(doc(owner, "businessSlugs/studio"), { slug: "studio" }));
+    await assertFails(setDoc(doc(owner, "auditLogs/one"), { action: "business.create" }));
+    await assertFails(setDoc(doc(owner, "platformSettings/global"), { defaultCountry: "US" }));
+    await assertFails(getDocs(collection(owner, "businessMembers")));
+    const stranger = testEnv
+      .authenticatedContext("stranger", { email: "stranger@example.test", email_verified: true })
+      .firestore() as unknown as Firestore;
+    await assertFails(getDoc(doc(stranger, "businesses/studio")));
+    const anon = testEnv.unauthenticatedContext().firestore() as unknown as Firestore;
+    await assertFails(getDoc(doc(anon, "platformSettings/global")));
+
+    const ownerStorage = testEnv
+      .authenticatedContext("owner", { email: "owner@example.test", email_verified: true })
+      .storage() as unknown as FirebaseStorage;
+    await assertSucceeds(
+      uploadString(ref(ownerStorage, "businesses/studio/brand/logo"), ONE_PIXEL_PNG, "base64", {
+        contentType: "image/png",
+      }),
+    );
+    await assertSucceeds(
+      uploadString(ref(ownerStorage, "businesses/studio/brand/cover"), ONE_PIXEL_PNG, "base64", {
+        contentType: "image/png",
+      }),
+    );
+    await assertFails(
+      uploadString(
+        ref(ownerStorage, "businesses/studio/brand/logo"),
+        "a".repeat(2 * 1024 * 1024 + 1),
+        "raw",
+        {
+          contentType: "image/png",
+        },
+      ),
+    );
+    await assertFails(
+      uploadString(ref(ownerStorage, "businesses/studio/private/secret"), ONE_PIXEL_PNG, "base64", {
+        contentType: "image/png",
+      }),
+    );
+    const staffStorage = testEnv
+      .authenticatedContext("staff", { email: "staff@example.test", email_verified: true })
+      .storage() as unknown as FirebaseStorage;
+    await assertFails(
+      uploadString(ref(staffStorage, "businesses/studio/brand/logo"), ONE_PIXEL_PNG, "base64", {
+        contentType: "image/png",
+      }),
+    );
+    const publicStorage = testEnv.unauthenticatedContext().storage() as unknown as FirebaseStorage;
+    await assertFails(getBytes(ref(publicStorage, "businesses/studio/brand/logo")));
   });
 });
 

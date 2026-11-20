@@ -1,6 +1,8 @@
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import type { APIRequestContext } from "@playwright/test";
+import { platformDefaults } from "../../shared/platform/defaults.ts";
 
 process.env.METADATA_SERVER_DETECTION ??= "none";
 
@@ -12,6 +14,20 @@ function adminAuth() {
   }
   if (getApps().length === 0) initializeApp({ projectId });
   return getAuth();
+}
+
+export async function seedPlatformSettings() {
+  const projectId =
+    process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? "demo-magemai";
+  if (projectId === "magemai") {
+    throw new Error(
+      "Refusing to seed platform settings for the live project from the emulator helper.",
+    );
+  }
+  if (getApps().length === 0) initializeApp({ projectId });
+  await getFirestore()
+    .doc("platformSettings/global")
+    .set({ ...platformDefaults, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
 }
 
 export async function ensureVerifiedUser(email: string, password: string, displayName: string) {

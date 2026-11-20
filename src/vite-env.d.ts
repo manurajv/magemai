@@ -10,7 +10,6 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_APP_CHECK_SITE_KEY?: string;
   readonly VITE_GOOGLE_AUTH_ENABLED?: string;
   readonly VITE_USE_FIREBASE_EMULATORS?: string;
-  readonly VITE_ALLOW_LIVE_FIREBASE?: string;
   readonly VITE_FIREBASE_EMULATOR_HOST?: string;
 }
 

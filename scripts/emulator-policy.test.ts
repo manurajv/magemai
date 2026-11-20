@@ -6,7 +6,6 @@ import {
   DEMO_PROJECT_ID,
   assertDemoProject,
   assertEmulatorHosts,
-  assertLiveFirebaseNotAllowed,
   buildExecArgs,
   buildExportArgs,
   buildSeedArgs,
@@ -28,13 +27,7 @@ describe("emulator command policy", () => {
     expect(() => assertDemoProject("")).toThrow(/Refusing project id/);
   });
 
-  it("refuses the live opt-in", () => {
-    expect(() => assertLiveFirebaseNotAllowed("true")).toThrow(/VITE_ALLOW_LIVE_FIREBASE/);
-    expect(() => assertLiveFirebaseNotAllowed("false")).not.toThrow();
-    expect(() => assertLiveFirebaseNotAllowed(undefined)).not.toThrow();
-  });
-
-  it("reads a live opt-in from env file text", () => {
+  it("reads a flag from env file text", () => {
     expect(
       envFileSetsFlag("VITE_ALLOW_LIVE_FIREBASE=true\n", "VITE_ALLOW_LIVE_FIREBASE", "true"),
     ).toBe(true);
@@ -80,7 +73,7 @@ describe("emulator command policy", () => {
         FIREBASE_STORAGE_EMULATOR_HOST: "127.0.0.1:9199",
         GCLOUD_PROJECT: "magemai",
       }),
-    ).toThrow(/magemai/);
+    ).toThrow(/demo-magemai/);
   });
 
   it("hardcodes demo-magemai on start, export, seed, and exec", () => {

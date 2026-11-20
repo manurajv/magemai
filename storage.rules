@@ -12,10 +12,45 @@ service firebase.storage {
         && request.resource.size <= 2 * 1024 * 1024;
     }
 
-    // Step 5: one avatar object per person. Every other path stays deny-all until step 9.
+    function memberDoc(businessId) {
+      return firestore.get(/databases/(default)/documents/businessMembers/$(businessId + '_' + request.auth.uid));
+    }
+
+    function isActiveMember(businessId) {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/businessMembers/$(businessId + '_' + request.auth.uid))
+        && memberDoc(businessId).data.status == 'active';
+    }
+
+    function isBrandEditor(businessId) {
+      return isActiveMember(businessId)
+        && memberDoc(businessId).data.role in ['owner', 'admin', 'manager'];
+    }
+
+    function isBrandImage(maxBytes) {
+      return request.resource != null
+        && request.resource.contentType.matches('image/(jpeg|png|webp)')
+        && request.resource.size > 0
+        && request.resource.size <= maxBytes;
+    }
+
     match /users/{userId}/avatar {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && request.auth.uid == userId && isAvatarImage();
+    }
+
+    match /businesses/{businessId}/brand/logo {
+      allow read: if isActiveMember(businessId);
+      allow write: if isBrandEditor(businessId) && isBrandImage(2 * 1024 * 1024);
+    }
+
+    match /businesses/{businessId}/brand/cover {
+      allow read: if isActiveMember(businessId);
+      allow write: if isBrandEditor(businessId) && isBrandImage(5 * 1024 * 1024);
+    }
+
+    match /businesses/{businessId}/private/{allPaths=**} {
+      allow read, write: if false;
     }
 
     match /{allPaths=**} {

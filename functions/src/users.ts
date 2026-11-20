@@ -3,57 +3,40 @@ import { FUNCTIONS_REGION } from "../../shared/firebase/region.js";
 import "./admin.js";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onObjectFinalized } from "firebase-functions/v2/storage";
 import { AVATAR_MAX_BYTES, isAvatarContentType } from "../../shared/profile/limits.js";
 import "./options.js";
+import { defaultBucket, stripDownloadTokens as stripObjectTokens } from "./storage.js";
 
 const AVATAR_PATH = (uid: string) => `users/${uid}/avatar`;
 
-function bucket() {
-  const project = process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? "";
-  return getStorage().bucket(`${project}.appspot.com`);
-}
-
-async function stripTokens(objectPath: string): Promise<void> {
-  const file = bucket().file(objectPath);
-  const [metadata] = await file.getMetadata();
-  const custom = metadata.metadata ?? {};
-  if (custom.magemaiDownloadTokenStripped === "true") return;
-  await file.setMetadata({
-    metadata: {
-      ...custom,
-      firebaseStorageDownloadTokens: null,
-      magemaiDownloadTokenStripped: "true",
-    },
+export const onAuthUserCreated = region(FUNCTIONS_REGION)
+  .auth.user()
+  .onCreate(async (record) => {
+    const ref = getFirestore().doc(`users/${record.uid}`);
+    const existing = await ref.get();
+    const system = {
+      id: record.uid,
+      email: record.email ?? "",
+      emailVerified: record.emailVerified,
+      status: "active" as const,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    if (existing.exists) {
+      await ref.update(system);
+      return;
+    }
+    await ref.set({
+      ...system,
+      displayName: record.displayName?.trim() ?? "",
+      phoneNumber: null,
+      photoPath: null,
+      locale: "en",
+      createdAt: FieldValue.serverTimestamp(),
+      lastLoginAt: null,
+    });
   });
-}
-
-export const onAuthUserCreated = region(FUNCTIONS_REGION).auth.user().onCreate(async (record) => {
-  const ref = getFirestore().doc(`users/${record.uid}`);
-  const existing = await ref.get();
-  const system = {
-    id: record.uid,
-    email: record.email ?? "",
-    emailVerified: record.emailVerified,
-    status: "active" as const,
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-  if (existing.exists) {
-    await ref.update(system);
-    return;
-  }
-  await ref.set({
-    ...system,
-    displayName: record.displayName?.trim() ?? "",
-    phoneNumber: null,
-    photoPath: null,
-    locale: "en",
-    createdAt: FieldValue.serverTimestamp(),
-    lastLoginAt: null,
-  });
-});
 
 export const syncAuthProfile = onCall(async (request) => {
   if (!request.auth) {
@@ -101,7 +84,8 @@ export const setUserAvatar = onCall(async (request) => {
     throw new HttpsError("permission-denied", "This account is disabled.");
   }
   const path = AVATAR_PATH(uid);
-  const file = bucket().file(path);
+  const bucket = defaultBucket();
+  const file = bucket.file(path);
   const [exists] = await file.exists();
   if (!exists) {
     throw new HttpsError("not-found", "Upload a profile photo before saving it.");
@@ -117,7 +101,7 @@ export const setUserAvatar = onCall(async (request) => {
   ) {
     throw new HttpsError("invalid-argument", "Choose a JPEG, PNG, or WebP image up to 2 MB.");
   }
-  await stripTokens(path);
+  await stripObjectTokens(bucket.name, path);
   const db = getFirestore();
   const userRef = db.doc(`users/${uid}`);
   const userSnap = await userRef.get();
@@ -152,6 +136,7 @@ export const setUserAvatar = onCall(async (request) => {
 
 export const stripDownloadTokens = onObjectFinalized(async (event) => {
   const name = event.data.name;
-  if (!name) return;
-  await stripTokens(name);
+  const bucketName = event.data.bucket;
+  if (!name || !bucketName) return;
+  await stripObjectTokens(bucketName, name);
 });

@@ -5,7 +5,7 @@
 **Tagline:** Your business. Your own space.  
 **Status:** Phase 1 step 4 (foundation and design system) is in the repository. Authentication, onboarding, dashboard data, and super-admin behavior are not.  
 **Date:** 2026-11-16  
-**Revision:** Owner review of PR #1 approved the direction and locked the four decisions in section 3. Later the same review added the `platformAdmins` registry, named `magemai` as the only cloud project, and made the Emulator Suite mandatory for local development and for all future testing ([section 24](#24-firebase-emulator-first-development-policy)).  
+**Revision:** Owner review of PR #1 approved the direction and locked the four decisions in section 3. Later the same review added the `platformAdmins` registry and named `magemai` as the only cloud project. On 2026-11-20 the app default changed to that live project ([section 24](#24-live-firebase-by-default)). Rules tests still use the Emulator Suite.  
 **Sources:** [Product blueprint](./magemai-blueprint.md) and the product owner's development instructions.
 
 This document is the architecture contract for Phase 1. Workflow steps 4–12 in [phase-1-checklist.md](./phase-1-checklist.md) implement this contract. [setup.md](./setup.md) is the environment guide.
@@ -51,7 +51,7 @@ The pilot business named in the blueprint is an ordinary tenant. It is created l
 | D11 | Deployed environments that run Functions are on the Blaze plan, with a budget alert before the first deploy. Local development uses the Emulator Suite and does not need Blaze. |
 | D12 | **Owner-approved.** No custom domain is configured. Hosting uses only the `web.app` and `firebaseapp.com` hostnames Firebase assigns to the project. |
 | D13 | **Owner-approved.** Firestore and Cloud Functions are located in `asia-south1` (Mumbai). |
-| D14 | One cloud Firebase project, `magemai` (number `122706427013`). Local development and automated tests use the Emulator Suite with project id `demo-magemai`, and that remains the workflow after commercial launch (section 24). The project id is read from environment variables, so another project could be pointed at later without a code change. There is no dev, staging, or production project split. |
+| D14 | One cloud Firebase project, `magemai` (number `122706427013`). From 2026-11-20 the app uses that live project unless `VITE_USE_FIREBASE_EMULATORS` is exactly `true`. Rules tests and CI Playwright stay on the Emulator Suite with project id `demo-magemai` (section 24). There is no dev, staging, or production project split. |
 
 The owner locked D3, D10, D12, and D13 in the review of PR #1. Later revisions do not reopen them. `platformAdmins` is another platform root collection under D3, not a new layout. D14 is the owner's later instruction about environments. During step 4 the owner kept Node.js 26.13.1 on the Windows development PC, so D2 now recommends Node 24 LTS and also accepts Node 26 for local app tooling. The deployed Functions runtime remains `nodejs24`. The trade-offs behind D3–D10 are in the sections below.
 
@@ -96,7 +96,7 @@ magemai/
 │       ├── admin/
 │       └── storage/
 ├── scripts/
-│   ├── emulators.mjs              # emulator lifecycle; project id demo-magemai only
+│   ├── emulators.mjs              # optional emulator lifecycle; project id demo-magemai only
 │   ├── seed-emulators.mjs         # synthetic users and businesses
 │   ├── provision-super-admin.ts
 │   └── seed-platform-settings.ts
@@ -108,7 +108,7 @@ magemai/
 ├── firestore.indexes.json
 ├── storage.rules
 ├── firebase.json
-├── .firebaserc                     # default demo-magemai; live alias is magemai and must be named explicitly
+├── .firebaserc                     # default magemai; demo alias is demo-magemai for the emulator suite
 ├── docs/
 └── README.md
 ```
@@ -217,7 +217,7 @@ Async work surfaces a loading state on the submitting control, an inline field e
 
 ## 6. Firebase architecture
 
-There is one cloud project, `magemai` (section 19). Local development and automated tests use the Emulator Suite and the project id `demo-magemai`. They do not connect to `magemai`. Section 19 lists the configuration keys. The keys are environment variables, so a different project id can be supplied later without changing application code.
+There is one cloud project, `magemai` (section 19). The app uses it unless the emulator flag is exactly `true`. Rules tests and the default Playwright suite still use the Emulator Suite and the project id `demo-magemai`. Section 19 lists the configuration keys. The keys are environment variables, so a different project id can be supplied later without changing application code.
 
 | Product | Phase 1 use |
 | --- | --- |
@@ -937,7 +937,7 @@ On success the stored business has `status: "active"`, `verificationStatus: "unv
 
 ## 19. Environment configuration
 
-The owner will not create separate development or staging Firebase projects. `magemai` is the only cloud project. Every real deploy, operator script, and hosted site uses it. Local development and automated tests use the Emulator Suite and never that project.
+The owner will not create separate development or staging Firebase projects. `magemai` is the only cloud project. The app and a production build use it unless the emulator flag is exactly `true`. Rules tests and CI Playwright stay on the Emulator Suite.
 
 | | Value |
 | --- | --- |
@@ -947,16 +947,17 @@ The owner will not create separate development or staging Firebase projects. `ma
 | Billing | The owner is upgrading this project to Blaze. Budget alerts are required before the first functions deploy (section 22). |
 | Firestore and Functions region | `asia-south1` (D13) |
 | Assigned hostnames | `magemai.web.app` and `magemai.firebaseapp.com` |
-| Local and CI project id | `demo-magemai` (emulators only) |
+| App default | live project `magemai` |
 
 Those two hostnames are the ones Firebase assigns to project id `magemai`. They are not a custom domain. D12 still forbids any other hostname. The public web config (API key, app id, and the rest of the `VITE_FIREBASE_*` values) is not in the repository. It is added later in a gitignored env file.
 
 | Work | Project | Rule |
 | --- | --- | --- |
-| `npm run dev`, unit tests, rules tests, Playwright, CI | `demo-magemai` on the Emulator Suite | The default. No cloud credentials. |
-| An explicit build or deploy, seed, or super-admin script | `magemai` | Only after the confirmation in the safeguards below. |
+| `npm run dev` and a production build | `magemai` | Default. Public web config stays in gitignored `.env.local`. |
+| Rules tests and `npm run test:e2e` | `demo-magemai` on the Emulator Suite | Required for `@firebase/rules-unit-testing` and for CI. |
+| `deploy:rules`, `deploy:functions`, `deploy:hosting`, and `seed:platform-settings` | `magemai` | Run by the owner on their PC. CI does not run them. |
 
-`.firebaserc` sets `default` to `demo-magemai`. A bare `firebase deploy`, or any Firebase CLI command that omits `--project`, therefore targets the demo project and cannot reach the live project. The live project is the alias `live`. A human names it with `--project live` or `--project magemai`. Do not run `firebase use live`: that command rewrites `projects.default`. There are no `dev`, `staging`, or `prod` project aliases. Emulator scripts still pass `--project demo-magemai` themselves.
+`.firebaserc` sets `default` to `magemai`. The alias `demo` is `demo-magemai`. Emulator scripts still pass `--project demo-magemai` themselves. Deploy scripts pass `--project magemai`. There are no `dev`, `staging`, or `prod` aliases. CI does not deploy.
 
 Authorized Auth domains for `magemai` are `localhost`, `127.0.0.1`, `magemai.web.app`, and `magemai.firebaseapp.com`. The OAuth consent screen support email is `mavixas.ceo@gmail.com`. No custom domain is added.
 
@@ -964,10 +965,10 @@ Authorized Auth domains for `magemai` are `localhost`, `127.0.0.1`, `magemai.web
 
 `magemai` holds real data once anyone uses the hosted app. These safeguards are part of the implementation, not optional hygiene:
 
-1. **Emulators by default.** The full contract is [section 24](#24-firebase-emulator-first-development-policy). `.env.development` sets `VITE_USE_FIREBASE_EMULATORS=true` and `VITE_FIREBASE_PROJECT_ID=demo-magemai`. Development mode connects to emulators even when that flag is unset. A production build fails, and the client also throws, if the emulator flag is `true`.
-2. **Tests cannot target the live project.** `npm test`, `npm run test:rules`, `npm run test:e2e`, and `npm run test:all` pass `--project demo-magemai`. They do not load `GOOGLE_APPLICATION_CREDENTIALS`. A test that sees project id `magemai` fails before it connects.
+1. **Live by default.** The full contract is [section 24](#24-live-firebase-by-default). The app connects to `magemai` unless `VITE_USE_FIREBASE_EMULATORS` is exactly `true`. A production build fails, and the client also throws, if that flag is `true`.
+2. **Rules tests stay on the emulator.** `npm run test:rules` and `npm run test:e2e` pass `--project demo-magemai` and refuse non-local emulator hosts. They do not load `GOOGLE_APPLICATION_CREDENTIALS`. `npm run test:e2e:live` is a separate operator command and is not part of CI.
 3. **No destructive scripts against `magemai`.** No script deletes collections, clears Auth users, imports emulator data, or overwrites the database. If a maintenance script of that kind is added later, it must refuse `--project magemai` outright. Seed and super-admin provisioning are intentional writes, not wipes, and they still require the confirmation below.
-4. **Explicit confirmation before any deploy or live write.** The deploy command and the operator scripts print project id `magemai` and project number `122706427013` and wait until the operator types both. A mismatch exits without calling Firebase. This document does not authorize a deploy.
+4. **Deploys are manual.** `npm run deploy:rules`, `npm run deploy:functions`, and `npm run deploy:hosting` pass `--project magemai` and do not ask for a typed confirmation. CI does not run them. This document does not run a deploy.
 5. **Budget alerts before the first functions deploy.** Section 22. The owner is upgrading `magemai` to Blaze. Minimum instances stay at 0.
 
 ### Environment variables
@@ -977,7 +978,7 @@ Vite modes stay in env files so the project id is data, not a constant in source
 | File | Mode | Committed | Points at |
 | --- | --- | --- | --- |
 | `.env.example` | names only | yes, values empty | — |
-| `.env.development` | `vite` / local | no | emulators, `demo-magemai` |
+| `.env.local` | `vite` / local and production build | no | live `magemai` web config |
 | `.env.production` | `vite build` | no | `magemai`, emulators off |
 
 Variable names. These are the Firebase *web* config values, which ship in the browser bundle. They are not service credentials. The service account is not one of them.
@@ -992,11 +993,10 @@ VITE_FIREBASE_APP_ID
 VITE_FIREBASE_APP_CHECK_SITE_KEY
 VITE_GOOGLE_AUTH_ENABLED
 VITE_USE_FIREBASE_EMULATORS
-VITE_ALLOW_LIVE_FIREBASE
 VITE_FIREBASE_EMULATOR_HOST
 ```
 
-`VITE_USE_FIREBASE_EMULATORS` is `true` in `.env.development`. Development still uses emulators when it is unset. A production build fails, and the client throws, if that flag is `true`. Live access during development requires `VITE_ALLOW_LIVE_FIREBASE=true` together with the emulator flag set to `false` (section 24.6). `VITE_GOOGLE_AUTH_ENABLED` is `true` only after Google provider is configured for that project; the login screen hides the Google button otherwise, and tests that need a real Google account are reported as not run.
+Leave `VITE_USE_FIREBASE_EMULATORS` unset for the live project. Set it to `true` only for the emulator suite. A production build fails, and the client throws, if that flag is `true`. `VITE_GOOGLE_AUTH_ENABLED` is `true` only after Google provider is configured; the login screen hides the Google button otherwise.
 
 `VITE_FIREBASE_APP_CHECK_SITE_KEY` is empty locally. A build aimed at `magemai` sets the reCAPTCHA Enterprise site key. The matching secret stays in App Check / Cloud, not in the frontend env file.
 
@@ -1104,12 +1104,15 @@ Step 4 wired the scripts in section 24.11. `npm run test:rules` currently checks
 
 ## 21. Deployment strategy
 
-There is one deploy target: project `magemai`, region `asia-south1`. Nothing in Phase 1 deploys unless the owner explicitly says to deploy, and the command then requires the typed confirmation in section 19.
+There is one deploy target: project `magemai`, region `asia-south1`. CI does not deploy. The owner runs the npm scripts below from their PC. They do not prompt for a typed project id.
 
-1. Confirm Firestore on `magemai` is in `asia-south1`, and deploy Functions to that same region, before the first write.
-2. Confirm Blaze and the budget alerts in section 22 before the first functions deploy. The owner is upgrading `magemai` to Blaze. This document does not authorize that deploy.
-3. Build with `--mode production` so `VITE_USE_FIREBASE_EMULATORS` is false and `VITE_FIREBASE_PROJECT_ID` is `magemai`. The build fails if the emulator flag is `true` (section 24.5).
-4. Run `firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting --project magemai` only after the operator types project id `magemai` and project number `122706427013`. `--project live` is the same target. A command that omits `--project` uses the `.firebaserc` default, `demo-magemai`.
+1. In the console, enable the Email/Password provider. Create Firestore in `asia-south1` if it does not exist. Stop if it already exists in another region.
+2. Confirm Blaze and the budget alerts in section 22 before the first functions deploy. This document does not enable billing.
+3. `npm run deploy:rules` deploys Firestore rules, Firestore indexes, and Storage rules.
+4. `npm run deploy:functions` deploys functions. It does not deploy `guardProviderSignIn` unless `MAGEMAI_DEPLOY_BLOCKING_AUTH=true`.
+5. `npm run seed:platform-settings` writes `platformSettings/global`. It uses Application Default Credentials.
+6. `npm run deploy:hosting` builds the app and deploys Hosting. `.env.local` must be present and must not set the emulator flag.
+7. `npm run test:e2e:live`, then `npm run test:cleanup:live`. Live e2e fails until steps 3–5 have been deployed.
 
 Hosting is a single-page app. `index.html` is not cached for long; hashed assets are. All routes rewrite to `index.html`. The live build must have `VITE_USE_FIREBASE_EMULATORS` unset or `false`.
 
@@ -1377,11 +1380,13 @@ Each item is a place the blueprint or the instructions left a choice open, or wh
 
 These defaults are enough to implement Phase 1 without another architecture pass. OQ-1 (region), OQ-2 (money units), OQ-20 (collection layout), and OQ-23 (Firebase-assigned hostnames only) are owner-approved and stay unchanged. The `platformAdmins` registry is an addition under that same collection layout.
 
-## 24. Firebase Emulator-First Development Policy
+## 24. Live Firebase by default
 
-This policy is mandatory. It applies to Phase 1 and to every later phase, including after commercial launch. Feature work and security testing run on the Emulator Suite. The cloud project remains the single project `magemai` (D14). There is no dev project and no staging project. D3, D10, D12, and D13 are unchanged.
+On 2026-11-20 the owner dropped the emulator-first default. The app uses the live project `magemai` unless `VITE_USE_FIREBASE_EMULATORS` is exactly `true`. He could not run the emulators on his PC and does not want them for day-to-day work. There is still one cloud project (D14) and no dev or staging project. D3, D10, D12, and D13 are unchanged.
 
-Step 4 added the files and scripts in this section. The commands below are the ones the repository runs. They always pass `--project demo-magemai`.
+Rules tests stay on the Emulator Suite because `@firebase/rules-unit-testing` only works there. `npm run test:e2e` also stays on the emulators so CI can run without live credentials. `npm run test:e2e:live` is the operator command for project `magemai`. It is not part of CI, and it cannot pass until rules, indexes, and functions are deployed.
+
+Emulator scripts still pass `--project demo-magemai`. Deploy scripts pass `--project magemai`. CI does not deploy.
 
 ### 24.1 Emulators and ports
 
@@ -1428,14 +1433,11 @@ FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199
 - Store the flag on `globalThis` (`globalThis.__magemaiEmulatorsConnected`). A Vite HMR reload re-executes the module and would otherwise call `connectAuthEmulator` a second time, which throws. The global flag survives that reload.
 - Do not call the `connect*Emulator` helpers from a component, a test, or a second module.
 
-### 24.4 Development uses emulators unless live access is opted in
+### 24.4 The app uses live Firebase unless the emulator flag is true
 
-`shouldUseEmulators()` is true when either of these holds:
+`resolveFirebaseAccess()` selects the emulator only when `VITE_USE_FIREBASE_EMULATORS` is exactly `true`. Any other value, including unset, selects the live project. The live project id defaults to `magemai` when `VITE_FIREBASE_PROJECT_ID` is empty. The public web config (API key, auth domain, storage bucket, sender id, app id) must be present in gitignored `.env.local`. Those values are not committed.
 
-- `import.meta.env.DEV` is true and `VITE_ALLOW_LIVE_FIREBASE` is not the string `true`.
-- `VITE_USE_FIREBASE_EMULATORS` is the string `true`.
-
-Unset means emulators during `vite` / `npm run dev`. `.env.development` still sets `VITE_USE_FIREBASE_EMULATORS=true` and `VITE_FIREBASE_PROJECT_ID=demo-magemai` so the default is visible in the file.
+There is no `VITE_ALLOW_LIVE_FIREBASE` flag and no live banner.
 
 ### 24.5 Production builds cannot connect to localhost
 
@@ -1446,48 +1448,27 @@ Both of these are required:
 
 `VITE_ALLOW_LIVE_FIREBASE` does not turn emulators on in a production build, and it does not weaken check 1.
 
-### 24.6 Opting into live Firebase while developing
+### 24.6 Emulators are optional
 
-Live access during `npm run dev` is off until both of these are set in gitignored `.env.development.local`:
+Set `VITE_USE_FIREBASE_EMULATORS=true` and `VITE_FIREBASE_PROJECT_ID=demo-magemai` only when you intend to use the local suite. Playwright's emulator config sets those for `npm run test:e2e`. A production build with the emulator flag set to `true` fails (24.5).
 
-```text
-VITE_USE_FIREBASE_EMULATORS=false
-VITE_ALLOW_LIVE_FIREBASE=true
-```
-
-The other `VITE_FIREBASE_*` values in that file are the public web config for project `magemai`. `VITE_FIREBASE_PROJECT_ID` must be `magemai`.
-
-| Flags | Result |
-| --- | --- |
-| Emulator flag true, live flag absent or false | Emulators. The normal path. |
-| Emulator flag true and live flag true | Emulators stay on. One console warning says the live flag was ignored. |
-| Emulator flag false, live flag absent | Development throws: live Firebase was not explicitly allowed. |
-| Emulator flag false and live flag true, project id `magemai` | Live project. Banner and console warning below. |
-| Either flag in a production build with the emulator flag true | Build fails (24.5). |
-
-The live path renders a full-width banner on every screen, including login. It is not dismissible. The text is: `LIVE FIREBASE — project magemai. This is not the emulator. Writes affect the real project.` The same sentence is written once with `console.warn` at startup. Automated tests must not set `VITE_ALLOW_LIVE_FIREBASE`. The test guard fails if that variable is `true`.
-
-This opt-in is for a manual check the owner has agreed to. It is not how features are developed or how security rules are tested.
+The emulator client still refuses project id `magemai` and any host other than `127.0.0.1`. That keeps a mistaken flag from pointing the emulator SDK at the live project.
 
 ### 24.7 Automated tests never touch the live project
 
 `scripts/emulators.mjs` is the only process that invokes the Firebase CLI for tests and for the emulator lifecycle. It hardcodes the project id `demo-magemai`. It does not read a project id from the environment.
 
-Before it spawns the CLI, it exits 1 when any of the following is true:
+Before it spawns the CLI, it exits 1 when the project id it is about to pass is not exactly `demo-magemai`. Emulator children drop `GOOGLE_APPLICATION_CREDENTIALS` so the suite cannot use a live service account.
 
-- The project id it is about to pass is not exactly `demo-magemai`, including when it is `magemai` or empty.
-- `VITE_ALLOW_LIVE_FIREBASE` is `true`.
-- A subcommand other than a documented live operator script is running with `GOOGLE_APPLICATION_CREDENTIALS` set. The emulator subcommands unset that variable in the child process and then fail if it is still set.
+`exec` (used by `test:rules` and `test:e2e`) also exits 1 after the emulators start if any of `FIREBASE_AUTH_EMULATOR_HOST`, `FIRESTORE_EMULATOR_HOST`, or `FIREBASE_STORAGE_EMULATOR_HOST` is missing or does not start with `127.0.0.1` or `localhost`.
 
-`exec` (used by the test scripts) also exits 1 after the emulators start if any of `FIREBASE_AUTH_EMULATOR_HOST`, `FIRESTORE_EMULATOR_HOST`, or `FIREBASE_STORAGE_EMULATOR_HOST` is missing or does not start with `127.0.0.1` or `localhost`. That check runs before Vitest or Playwright.
-
-`npm test` (unit and component tests) does not start the CLI and does not construct a cloud app. If a unit test imports `getFirebase`, Vitest setup forces the emulator branch and the same project-id guard. It never loads a service-account file.
+`npm test` stubs the emulator flag so component tests do not need live credentials. A project id of `magemai` is not, by itself, a unit-test failure. `npm run test:e2e:live` and `npm run test:cleanup:live` are separate commands. They use Application Default Credentials on the operator's machine, never a committed key, and this repository's CI does not run them.
 
 ### 24.8 No deploy without approval, and no destructive live commands
 
-The npm scripts in 24.10 do not deploy. They do not call `firebase deploy`, `firestore:delete`, `auth:export` against `magemai`, or `emulators:export` against a cloud project.
+CI does not deploy. The owner runs `deploy:rules`, `deploy:functions`, and `deploy:hosting` from their own machine. Those scripts do not prompt for the project id. They do not run from tests.
 
-A deploy helper is not part of this script list. If one is added later, it is a separate command and it keeps the confirmation already required: the operator types `magemai` and `122706427013`, and the owner has already approved that deploy. CI does not set that approval.
+`guardProviderSignIn` is a blocking Auth function and needs Identity Platform. A normal `deploy:functions` does not export it. The emulator loads it because `FUNCTIONS_EMULATOR` is set. After Identity Platform is enabled, set `MAGEMAI_DEPLOY_BLOCKING_AUTH=true` for that deploy only. Until then, a verified Google sign-in can attach to an existing password account.
 
 `emulators:reset` deletes only the local directory `emulator-data/` inside the repository. The script resolves that path, checks the final segment is `emulator-data`, and refuses any other path. It does not call the Firebase CLI.
 
@@ -1509,7 +1490,7 @@ It also writes `platformSettings/global` from `shared/platform/defaults.ts`. Ema
 
 The password exists only in the Auth emulator. The seed process exits before any write if the project id is not `demo-magemai`.
 
-The live operator command `npm run seed:platform-settings -- --project magemai` is not this seed. It writes platform settings only, after the typed confirmation, and it does not create these users.
+`npm run seed:platform-settings` writes `platformSettings/global` and one audit row `platform_settings.seed`. Against the emulator it runs when `FIRESTORE_EMULATOR_HOST` is set. With that host unset it uses Application Default Credentials and project `magemai`. It does not create the synthetic users above and it does not ask for a typed confirmation.
 
 ### 24.10 Import, export, and gitignore
 
@@ -1535,14 +1516,20 @@ Step 4 adds these `package.json` scripts. Each name is invoked as `npm run <name
 
 | Script | Command | What it is allowed to touch |
 | --- | --- | --- |
-| `dev` | `vite` | Emulators on `127.0.0.1`, unless 24.6 is opted in |
+| `dev` | `vite` | Live `magemai` unless `VITE_USE_FIREBASE_EMULATORS=true` |
 | `emulators:start` | `node scripts/emulators.mjs start` | Local suite only, project `demo-magemai`, import/export `./emulator-data` |
 | `emulators:export` | `node scripts/emulators.mjs export` | The running local suite, write `./emulator-data` |
 | `emulators:reset` | `node scripts/emulators.mjs reset` | Delete local `./emulator-data` only |
 | `emulators:seed` | `node scripts/emulators.mjs seed` | Auth and Firestore emulators, synthetic rows from 24.9 |
-| `test` | `vitest run` | No cloud app. Emulator guard if Firebase is imported |
+| `test` | `vitest run` | Unit tests. The Vitest config stubs the emulator flag |
 | `test:rules` | `node scripts/emulators.mjs exec -- vitest run --config vitest.rules.config.ts` | `firebase emulators:exec --project demo-magemai` |
-| `test:e2e` | `node scripts/emulators.mjs exec -- playwright test` | Same exec, then Playwright against the local app |
+| `test:e2e` | `node scripts/emulators.mjs exec -- playwright test` | Emulator Playwright, including onboarding |
+| `test:e2e:live` | `playwright test --config playwright.live.config.ts` | Live `magemai`. Needs a deploy and ADC. Not run in CI |
+| `test:cleanup:live` | `node scripts/cleanup-live-e2e.mjs` | Deletes only Auth users whose email starts with `e2e+` and their E2E businesses |
+| `seed:platform-settings` | `node scripts/seed-platform-settings.mjs` | `platformSettings/global` on the emulator or on live `magemai` |
+| `deploy:rules` | `firebase deploy --only firestore:rules,firestore:indexes,storage --project magemai` | Rules, indexes, and Storage rules |
+| `deploy:functions` | `firebase deploy --only functions --project magemai` | Functions, without the blocking Auth function |
+| `deploy:hosting` | `npm run build && firebase deploy --only hosting --project magemai` | Production build, then Hosting |
 | `typecheck` | `tsc --noEmit -p tsconfig.json` and `tsc --noEmit -p functions/tsconfig.json` | Local files |
 | `lint` | `eslint .` | Local files |
 | `format` | `prettier --write .` | Local files |
@@ -1553,6 +1540,6 @@ Step 4 adds these `package.json` scripts. Each name is invoked as `npm run <name
 firebase emulators:exec --project demo-magemai --only auth,firestore,functions,storage <the command after -->
 ```
 
-`test:rules` and `test:e2e` do not include a path that can be retargeted at `magemai`. There is no `deploy` script in this table.
+`test:rules` and `test:e2e` stay on `demo-magemai`. `test:e2e:live` is the only Playwright command aimed at `magemai`.
 
 Windows and the day-to-day commands are in [setup.md](./setup.md).
