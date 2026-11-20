@@ -176,26 +176,26 @@ Maps to AC-7, AC-8, AC-9, AC-15, AC-16.
 
 Maps to AC-11, AC-13, AC-15.
 
-- [ ] Implement `scripts/provision-super-admin.ts` to the contract in architecture section 17.3.
-- [ ] Grant writes `platformAdmins/{uid}` to `status: "active"` (with `grantedBy` and `grantedAt`) before it merges the `superAdmin` claim, then writes `super_admin.provision`.
-- [ ] `--revoke` requires `--reason`. It sets `status: "revoked"` with `revokedBy`, `revokedAt`, and `reason` first, then calls `revokeRefreshTokens`, then removes the claim, then writes `super_admin.revoke`. It does not delete the Auth user or the registry document.
-- [ ] Re-running grant or revoke is idempotent, as in the architecture table: no duplicate audit row when the desired state is already stored, and a re-grant clears the revocation fields and writes one new audit row.
-- [ ] A failed run exits non-zero, prints the last successful step, and is safe to re-run. A partial grant does not authorize platform reads. A partial revoke does not leave them authorized.
-- [ ] Wire `npm run provision:super-admin`. The script reads `GOOGLE_APPLICATION_CREDENTIALS` and has no claim-setting or registry-writing callable beside it.
-- [ ] `assertActivePlatformAdmin` runs on every `setBusinessStatus` and `setBusinessVerification` call and requires both the claim and `platformAdmins/{uid}.status == "active"`.
-- [ ] Document the command and the service-account requirements in `docs/setup.md` if the implemented flags differ from the plan.
-- [ ] `/super-admin` guard: loading state, then login redirect, then verification redirect, then a 403 state when the claim is absent or the caller's registry document is missing or `revoked`. The business dashboard is not used as the denial screen.
-- [ ] Navigation for super-admin is shown from the ID token claim only. A stale claim plus a revoked registry still ends on the 403 state once the registry read returns. Functions do not trust the claim alone.
-- [ ] Overview uses `getCountFromServer` for users and businesses.
-- [ ] `/super-admin/users` lists email, display name, status, email verified, and created time. Paginated by 25. Read-only (OQ-10).
-- [ ] `/super-admin/businesses` lists name, slug, owner, status, verification, and created time. Paginated by 25.
-- [ ] Suspend, reactivate, and verification changes call `setBusinessStatus` and `setBusinessVerification`, ask for confirmation, and then show the new audit row.
-- [ ] `/super-admin/verifications` is the business table filtered to businesses that are not `verified` (OQ-9).
-- [ ] `/super-admin/audit-logs` lists newest first, paginated, with scope and optional business filter.
-- [ ] Coming soon: categories, subscriptions, reports, platform settings (OQ-27).
-- [ ] A normal owner who opens `/super-admin` sees 403 (AC-11).
-- [ ] Each status and verification change has a matching audit document. A no-op does not write a duplicate (AC-13).
-- [ ] Loading, empty, and error states on each super-admin list (AC-15).
+- [x] Implement `scripts/provision-super-admin.ts` to the contract in architecture section 17.3.
+- [x] Grant writes `platformAdmins/{uid}` to `status: "active"` (with `grantedBy` and `grantedAt`) before it merges the `superAdmin` claim, then writes `super_admin.provision`.
+- [x] `--revoke` requires `--reason`. It sets `status: "revoked"` with `revokedBy`, `revokedAt`, and `reason` first, then calls `revokeRefreshTokens`, then removes the claim, then writes `super_admin.revoke`. It does not delete the Auth user or the registry document.
+- [x] Re-running grant or revoke is idempotent, as in the architecture table: no duplicate audit row when the desired state is already stored, and a re-grant clears the revocation fields and writes one new audit row.
+- [x] A failed run exits non-zero, prints the last successful step, and is safe to re-run. A partial grant does not authorize platform reads. A partial revoke does not leave them authorized.
+- [x] Wire `npm run provision:super-admin`. The script reads `GOOGLE_APPLICATION_CREDENTIALS` and has no claim-setting or registry-writing callable beside it.
+- [x] `assertActivePlatformAdmin` runs on every `setBusinessStatus` and `setBusinessVerification` call and requires both the claim and `platformAdmins/{uid}.status == "active"`.
+- [x] Document the command and the service-account requirements in `docs/setup.md` if the implemented flags differ from the plan.
+- [x] `/super-admin` guard: loading state, then login redirect, then verification redirect, then a 403 state when the claim is absent or the caller's registry document is missing or `revoked`. The business dashboard is not used as the denial screen.
+- [x] Navigation for super-admin is shown from the ID token claim only. A stale claim plus a revoked registry still ends on the 403 state once the registry read returns. Functions do not trust the claim alone.
+- [x] Overview uses `getCountFromServer` for users and businesses.
+- [x] `/super-admin/users` lists email, display name, status, email verified, and created time. Paginated by 25. Read-only (OQ-10).
+- [x] `/super-admin/businesses` lists name, slug, owner, status, verification, and created time. Paginated by 25.
+- [x] Suspend, reactivate, and verification changes call `setBusinessStatus` and `setBusinessVerification`, ask for confirmation, and then show the new audit row.
+- [x] `/super-admin/verifications` is the business table filtered to businesses that are not `verified` (OQ-9).
+- [x] `/super-admin/audit-logs` lists newest first, paginated, with scope and optional business filter.
+- [x] Coming soon: categories, subscriptions, and reports. `/super-admin/settings` is a read-only view of the seeded document (OQ-27).
+- [x] A normal owner who opens `/super-admin` sees 403 (AC-11).
+- [x] Each status and verification change has a matching audit document. A no-op does not write a duplicate (AC-13).
+- [x] Loading, empty, and error states on each super-admin list (AC-15).
 
 ## Step 9 — Security rules and tests
 
@@ -206,8 +206,8 @@ Maps to AC-6, AC-10, AC-11, AC-12, AC-13.
 - [ ] `firestore.indexes.json` contains the composite indexes from architecture section 15.
 - [ ] `stripDownloadTokens` removes download-token metadata on finalize. `setBusinessImage` and `setUserAvatar` strip it as well.
 - [ ] Application code does not call `getDownloadURL`. Search the repo and record the result.
-- [ ] Rules helper `isActivePlatformAdmin()` matches architecture section 15: signed in, `request.auth.token.superAdmin == true`, `exists` on `platformAdmins/{request.auth.uid}`, then `get` and `status == "active"`. No allow rule treats the claim as sufficient.
-- [ ] Client create, update, and delete of `platformAdmins` are denied for every caller.
+- [x] Rules helper `isActivePlatformAdmin()` matches architecture section 15: signed in, `request.auth.token.superAdmin == true`, `exists` on `platformAdmins/{request.auth.uid}`, then `get` and `status == "active"`. No allow rule treats the claim as sufficient.
+- [x] Client create, update, and delete of `platformAdmins` are denied for every caller.
 - [ ] Rules helpers `exists()` before `get()` on the membership path and on the platform-admin path.
 - [ ] Wire `npm run test:rules` with `@firebase/rules-unit-testing` and the emulators.
 - [ ] XT-1 Member of A cannot read business B.
@@ -220,7 +220,7 @@ Maps to AC-6, AC-10, AC-11, AC-12, AC-13.
 - [ ] XT-8 Client cannot write an audit document.
 - [ ] XT-9 User cannot change `status` or add an unknown admin field on their user document.
 - [ ] XT-10 A user with no claim cannot read another user or list users.
-- [ ] XT-11 A non-admin callable `setBusinessStatus` returns `permission-denied`.
+- [x] XT-11 A non-admin callable `setBusinessStatus` returns `permission-denied`.
 - [ ] XT-12 Staff cannot read their business's audit logs.
 - [ ] XT-13 Owner can read their business audit logs and cannot read platform audit logs.
 - [ ] XT-14 Active platform admin (claim and registry `active`) can read both businesses, users, and platform audit logs.
@@ -230,11 +230,11 @@ Maps to AC-6, AC-10, AC-11, AC-12, AC-13.
 - [ ] XT-18 The private prefix is denied for read and write.
 - [ ] XT-19 Registration does not set `superAdmin`.
 - [ ] XT-20 `createBusiness` ignores client-supplied role, status, and verification.
-- [ ] XT-21 Active super-admin (claim true and `platformAdmins` status `active`) can read users, businesses, and platform audit logs, and `setBusinessStatus` is authorized.
-- [ ] XT-22 Normal user, with no claim and no registry document, is denied those platform reads.
-- [ ] XT-23 Revoked super-admin (registry `revoked`, claim absent) is denied those platform reads and `setBusinessStatus`.
-- [ ] XT-24 Revoked admin whose test token still has `superAdmin: true` is denied those platform reads and `setBusinessStatus`.
-- [ ] XT-25 Normal user cannot create or update a `platformAdmins` record. The same test denies that write from an active super-admin's client SDK.
+- [x] XT-21 Active super-admin (claim true and `platformAdmins` status `active`) can read users, businesses, and platform audit logs, and `setBusinessStatus` is authorized.
+- [x] XT-22 Normal user, with no claim and no registry document, is denied those platform reads.
+- [x] XT-23 Revoked super-admin (registry `revoked`, claim absent) is denied those platform reads and `setBusinessStatus`.
+- [x] XT-24 Revoked admin whose test token still has `superAdmin: true` is denied those platform reads and `setBusinessStatus`.
+- [x] XT-25 Normal user cannot create or update a `platformAdmins` record. The same test denies that write from an active super-admin's client SDK.
 - [ ] Positive cases from architecture section 20.4: owner reads their business, owner uploads a small PNG, staff cannot update settings, super-admin suspension writes an audit row.
 - [ ] If the member-list query shape is rejected by rules, add `listBusinessMembers` and test it. Do not open the collection.
 - [ ] Confirm the Admin SDK call that clears download tokens against the emulator, and note any difference in `docs/setup.md`.
@@ -251,9 +251,9 @@ Maps to AC-16 and AC-17. Also re-runs the flows behind AC-1 through AC-15.
 - [ ] E2E: create a second business, switch, and see only the selected business.
 - [ ] E2E: sign out and confirm `/admin` returns to `/login`.
 - [ ] E2E: password reset through the emulator out-of-band code.
-- [ ] E2E: normal user opening `/super-admin` sees 403.
-- [ ] E2E, on the emulator project `demo-magemai` only: provisioned super-admin (claim and active registry) sees both lists, suspends a business, and the owner sees the banner and a disabled profile form.
-- [ ] E2E: after the registry is set to `revoked` while the test session token still has `superAdmin: true`, the user list does not load and the screen is the 403 or authorization error state.
+- [x] E2E: normal user opening `/super-admin` sees 403.
+- [x] E2E, on the emulator project `demo-magemai` only: provisioned super-admin (claim and active registry) sees both lists, suspends a business, and the owner sees the banner and a disabled profile form.
+- [x] E2E: after the registry is set to `revoked` while the test session token still has `superAdmin: true`, the user list does not load and the screen is the 403 or authorization error state.
 - [ ] Do not point Playwright, the rules suite, or a data wipe at the live project `magemai`.
 - [ ] E2E: the audit list shows the suspension.
 - [ ] E2E: Google sign-in through the Auth emulator's simulated provider.

@@ -14,7 +14,12 @@ import { NotFoundPage } from "@/app/pages/not-found-page";
 import { OnboardingPage } from "@/app/pages/onboarding-page";
 import { ProfilePage } from "@/app/pages/profile-page";
 import { RegisterPage } from "@/app/pages/register-page";
+import { SuperAdminAuditPage } from "@/app/pages/super-admin-audit-page";
+import { SuperAdminBusinessesPage } from "@/app/pages/super-admin-businesses-page";
 import { SuperAdminPage } from "@/app/pages/super-admin-page";
+import { SuperAdminSettingsPage } from "@/app/pages/super-admin-settings-page";
+import { SuperAdminUsersPage } from "@/app/pages/super-admin-users-page";
+import { SuperAdminVerificationsPage } from "@/app/pages/super-admin-verifications-page";
 import { VerifyEmailPage } from "@/app/pages/verify-email-page";
 import { LoadingState } from "@/components/shared/loading-state";
 import { RouteErrorBoundary } from "@/components/shared/route-error-boundary";
@@ -83,7 +88,14 @@ export const router = createBrowserRouter([
           },
           {
             element: <SuperAdminLayout />,
-            children: [{ path: "/super-admin", element: <SuperAdminPage /> }],
+            children: [
+              { path: "/super-admin", element: <SuperAdminPage /> },
+              { path: "/super-admin/users", element: <SuperAdminUsersPage /> },
+              { path: "/super-admin/businesses", element: <SuperAdminBusinessesPage /> },
+              { path: "/super-admin/verifications", element: <SuperAdminVerificationsPage /> },
+              { path: "/super-admin/audit-logs", element: <SuperAdminAuditPage /> },
+              { path: "/super-admin/settings", element: <SuperAdminSettingsPage /> },
+            ],
           },
           { path: "/business/register", element: <OnboardingPage /> },
         ],

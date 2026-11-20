@@ -115,6 +115,58 @@ export async function seedMembership(input: {
   });
 }
 
+export async function grantPlatformAdmin(uid: string, email: string) {
+  const projectId =
+    process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? "demo-magemai";
+  if (projectId === "magemai")
+    throw new Error("Refusing to grant platform access on the live project.");
+  if (getApps().length === 0) initializeApp({ projectId });
+  await getAuth().setCustomUserClaims(uid, { superAdmin: true });
+  const db = getFirestore();
+  await db.doc(`users/${uid}`).set(
+    {
+      id: uid,
+      email,
+      emailVerified: true,
+      displayName: "Platform admin",
+      phoneNumber: null,
+      photoPath: null,
+      locale: "en",
+      status: "active",
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      lastLoginAt: null,
+    },
+    { merge: true },
+  );
+  await db.doc(`platformAdmins/${uid}`).set({
+    id: uid,
+    status: "active",
+    grantedBy: "emulator-test",
+    grantedAt: FieldValue.serverTimestamp(),
+    revokedBy: null,
+    revokedAt: null,
+    reason: null,
+  });
+}
+
+export async function revokePlatformRegistry(uid: string) {
+  const projectId =
+    process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? "demo-magemai";
+  if (projectId === "magemai")
+    throw new Error("Refusing to revoke platform access on the live project.");
+  if (getApps().length === 0) initializeApp({ projectId });
+  await getFirestore().doc(`platformAdmins/${uid}`).set(
+    {
+      status: "revoked",
+      revokedBy: "emulator-test",
+      revokedAt: FieldValue.serverTimestamp(),
+      reason: "emulator revocation",
+    },
+    { merge: true },
+  );
+}
+
 export async function ensureVerifiedUser(email: string, password: string, displayName: string) {
   const auth = adminAuth();
   try {

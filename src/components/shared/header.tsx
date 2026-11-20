@@ -1,5 +1,6 @@
 import { Menu } from "lucide-react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
+import { useSuperAdminClaim } from "@/app/platform/use-super-admin-claim";
 import { useAuth } from "@/app/providers/auth-context";
 import { BusinessSwitcher } from "@/components/business/business-switcher";
 import { Logo } from "@/components/shared/logo";
@@ -13,6 +14,7 @@ type HeaderProps = {
 export function Header({ onOpenSidebar }: HeaderProps) {
   const auth = useAuth();
   const navigate = useNavigate();
+  const platformClaim = useSuperAdminClaim(auth.user?.uid ?? null);
   const items = auth.user
     ? [
         { label: "Profile", onSelect: () => navigate("/profile") },
@@ -37,6 +39,11 @@ export function Header({ onOpenSidebar }: HeaderProps) {
         <Logo compact />
       </div>
       <BusinessSwitcher />
+      {platformClaim === "yes" ? (
+        <Link to="/super-admin" className="text-sm font-medium text-foreground">
+          Platform
+        </Link>
+      ) : null}
       <div className="ml-auto">
         <DropdownMenu
           label="Account"
