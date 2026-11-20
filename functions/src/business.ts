@@ -1,6 +1,6 @@
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import {
   COVER_MAX_BYTES,
   CREATIONS_PER_DAY,
@@ -84,7 +84,7 @@ async function assertAccountActive(uid: string): Promise<void> {
   }
 }
 
-export const checkSlugAvailability = onCall(async (request) => {
+export async function checkSlugAvailability(request: CallableRequest) {
   const uid = requireVerifiedUser(request.auth);
   await assertAccountActive(uid);
   const parsed = businessInputSchema.shape.slug.safeParse(request.data?.slug);
@@ -93,7 +93,7 @@ export const checkSlugAvailability = onCall(async (request) => {
   if (isReservedSlug(parsed.data, settings.reservedSlugs)) return { available: false };
   const existing = await getFirestore().doc(`businessSlugs/${parsed.data}`).get();
   return { available: !existing.exists };
-});
+}
 
 async function enforceCaps(uid: string): Promise<void> {
   const db = getFirestore();
@@ -117,7 +117,7 @@ async function enforceCaps(uid: string): Promise<void> {
   }
 }
 
-export const createBusiness = onCall(async (request) => {
+export async function createBusiness(request: CallableRequest) {
   const uid = requireVerifiedUser(request.auth);
   await assertAccountActive(uid);
   const parsed = businessInputSchema.safeParse(request.data);
@@ -237,9 +237,9 @@ export const createBusiness = onCall(async (request) => {
   });
 
   return { businessId, created };
-});
+}
 
-export const setBusinessImage = onCall(async (request) => {
+export async function setBusinessImage(request: CallableRequest) {
   const uid = requireVerifiedUser(request.auth);
   await assertAccountActive(uid);
   const businessId = typeof request.data?.businessId === "string" ? request.data.businessId : "";
@@ -309,7 +309,7 @@ export const setBusinessImage = onCall(async (request) => {
   });
   await batch.commit();
   return { path: objectPath };
-});
+}
 
 function assertMemberEdit(
   member: { exists: boolean; get: (field: string) => unknown },
@@ -360,7 +360,7 @@ function profileUnchanged(
   );
 }
 
-export const updateBusinessProfile = onCall(async (request) => {
+export async function updateBusinessProfile(request: CallableRequest) {
   const uid = requireVerifiedUser(request.auth, "editing a business");
   await assertAccountActive(uid);
   const parsed = businessProfileUpdateSchema.safeParse(request.data);
@@ -419,7 +419,7 @@ export const updateBusinessProfile = onCall(async (request) => {
     });
   });
   return { ok: true, changed };
-});
+}
 
 function settingsUnchanged(
   business: { get: (field: string) => unknown },
@@ -434,7 +434,7 @@ function settingsUnchanged(
   );
 }
 
-export const updateBusinessSettings = onCall(async (request) => {
+export async function updateBusinessSettings(request: CallableRequest) {
   const uid = requireVerifiedUser(request.auth, "editing business settings");
   await assertAccountActive(uid);
   const parsed = businessSettingsUpdateSchema.safeParse(request.data);
@@ -493,4 +493,4 @@ export const updateBusinessSettings = onCall(async (request) => {
     });
   });
   return { ok: true, changed };
-});
+}

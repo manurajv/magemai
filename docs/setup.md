@@ -237,6 +237,8 @@ npm run test:cleanup:live
 
 `deploy:functions` compiles `functions` before it uploads. `firebase.json` sets that predeploy to `npm --prefix "$RESOURCE_DIR" run build`. The Firebase CLI fills `RESOURCE_DIR` on Windows and on Linux, so a stale `functions/lib` is not deployed. The runtime stays `nodejs24`. Every function is 2nd gen. `onAuthUserCreated` is gone: Gen1 cannot run `nodejs24`. The next deploy asks to delete that old trigger. Confirm the deletion. Do not add `beforeUserCreated`.
 
+`npm run deploy:functions` runs `node --experimental-strip-types scripts/deploy-functions.ts`. That wrapper sets `FUNCTIONS_DISCOVERY_TIMEOUT` to `60` when it is missing or lower. The Firebase CLI otherwise stops after 10 seconds with "Cannot determine backend specification. Timeout after 10000", which showed up on Windows while loading the functions code. The same Node process is used on Windows and on Linux, so the timeout does not depend on shell syntax. A value already above 60 is left alone. Handler modules stay behind a dynamic import, so discovery loads the function entry file and each function loads the Admin SDK on its first call.
+
 `deploy:functions` publishes the callables in `asia-south1` and `stripDownloadTokens` in `us-east1`. The trigger has to share the bucket region. Deploying it in `asia-south1` fails with "A function in region asia-south1 cannot listen to a bucket in region us-east1". The first deploy of that 2nd gen trigger can also fail while Eventarc service-agent permissions propagate. Wait a minute and run `npm run deploy:functions` again. No code change is required for that warning.
 
 `deploy:functions` does not publish `guardProviderSignIn`. That blocking function needs Identity Platform. Set `MAGEMAI_DEPLOY_BLOCKING_AUTH=true` in the same PowerShell window only after Identity Platform is enabled, then run `npm run deploy:functions` again. Until then, Google can attach to an existing password account.
@@ -459,7 +461,7 @@ Scheduled database exports, which are the backup story before real tenant data l
 
 ## 9. Platform seed and super-admin provisioning
 
-Both scripts are implemented in the checklist (seed in step 6, provisioning in step 8). Until they exist, do not hand-edit Firestore to fake an administrator. Platform access requires both the custom claim `superAdmin: true` and `platformAdmins/{uid}` with `status` `active`. Clients cannot write that collection. The operator script is the only supported writer. Architecture section 17.3 is the contract, including order, idempotence, and partial failure.
+Both scripts are implemented (seed in step 6, provisioning in step 8). Do not hand-edit Firestore to fake an administrator. Platform access requires both the custom claim `superAdmin: true` and `platformAdmins/{uid}` with `status` `active`. Clients cannot write that collection. The operator script is the only supported writer. Architecture section 17.3 is the contract, including order, idempotence, and partial failure.
 
 ### 9.1 Service account
 
@@ -562,7 +564,7 @@ With `.env.local` in place (section 2.7):
 npm run dev
 ```
 
-The Vite URL is http://127.0.0.1:5173. The app uses project `magemai`. Create an account on `/register`, verify the email from the real inbox, then sign in. The personal profile is `/profile`. `/business/register` is the onboarding wizard. It needs the deploy in section 11 and `npm run seed:platform-settings` before a business can be saved. After a successful create, the app stores `magemai.activeBusinessId` and opens `/admin`. The header switcher lists every active membership. A stored id that is no longer an active membership falls back to the newest one, or back to the wizard when there are none. `/admin/profile` and `/admin/settings` save through `updateBusinessProfile` and `updateBusinessSettings`. Those two callables are not on the live project until the next `npm run deploy:functions`. The audit read rule needs `npm run deploy:rules` before an owner can read business audit rows in production. No new Firestore index is required for this step.
+The Vite URL is http://127.0.0.1:5173. The app uses project `magemai`. Create an account on `/register`, verify the email from the real inbox, then sign in. The personal profile is `/profile`. `/business/register` is the onboarding wizard. It needs the deploy in section 11 and `npm run seed:platform-settings` before a business can be saved. After a successful create, the app stores `magemai.activeBusinessId` and opens `/admin`. The header switcher lists every active membership. A stored id that is no longer an active membership falls back to the newest one, or back to the wizard when there are none. `/admin/profile` and `/admin/settings` save through `updateBusinessProfile` and `updateBusinessSettings`. `/super-admin` is the platform area. It needs the step 8 rules, indexes, and `setBusinessStatus` / `setBusinessVerification` deployed, plus `npm run provision:super-admin` for the operator. A user without the claim, or with a revoked `platformAdmins` row, sees a 403 state on that route.
 
 Create businesses through that wizard. Do not add a hard-coded tenant.
 
@@ -577,7 +579,7 @@ npm run seed:platform-settings
 npm run deploy:hosting
 ```
 
-`deploy:rules` publishes Firestore rules, the membership and creation indexes, and Storage rules. `deploy:functions` builds the functions package, then publishes the callables, including `createBusiness` and `syncAuthProfile`, in `asia-south1`, and publishes `stripDownloadTokens` in `us-east1` so it can listen to `magemai.firebasestorage.app`. It leaves out the Identity Platform blocking function and does not deploy a 1st gen Auth trigger. `deploy:hosting` runs `npm run build` and publishes Hosting. `.firebaserc` already defaults to `magemai`. These scripts also pass `--project magemai`.
+`deploy:rules` publishes Firestore rules, the membership and creation indexes, the business and audit indexes used by the platform lists, and Storage rules. `deploy:functions` builds the functions package, then publishes the callables, including `createBusiness`, `syncAuthProfile`, `setBusinessStatus`, and `setBusinessVerification`, in `asia-south1`, and publishes `stripDownloadTokens` in `us-east1` so it can listen to `magemai.firebasestorage.app`. It sets `FUNCTIONS_DISCOVERY_TIMEOUT` to 60 seconds. It leaves out the Identity Platform blocking function and does not deploy a 1st gen Auth trigger. `deploy:hosting` runs `npm run build` and publishes Hosting. `.firebaserc` already defaults to `magemai`. These scripts also pass `--project magemai`. Provisioning a super-admin is not part of deploy. Run section 9.3 after the rules and functions are live.
 
 After that first functions deploy, set the Artifact Registry cleanup described in section 2.9 for `asia-south1` and `us-east1`.
 

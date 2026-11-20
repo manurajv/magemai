@@ -1,9 +1,7 @@
-import { STORAGE_REGION } from "../../shared/firebase/region.js";
 import "./admin.js";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { onObjectFinalized } from "firebase-functions/v2/storage";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { AVATAR_MAX_BYTES, isAvatarContentType } from "../../shared/profile/limits.js";
 import "./options.js";
 import { defaultBucket, stripDownloadTokens as stripObjectTokens } from "./storage.js";
@@ -25,7 +23,7 @@ function shouldFillDisplayName(stored: unknown, authName: string): boolean {
  * profile-creation path. The client calls it after sign-up and sign-in, and
  * again on app load when the document is missing.
  */
-export const syncAuthProfile = onCall(async (request) => {
+export async function syncAuthProfile(request: CallableRequest) {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Sign in before syncing your profile.");
   }
@@ -74,9 +72,9 @@ export const syncAuthProfile = onCall(async (request) => {
     tx.update(ref, patch);
   });
   return { ok: true };
-});
+}
 
-export const setUserAvatar = onCall(async (request) => {
+export async function setUserAvatar(request: CallableRequest) {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Sign in before saving a profile photo.");
   }
@@ -134,17 +132,18 @@ export const setUserAvatar = onCall(async (request) => {
   });
   await batch.commit();
   return { photoPath: path };
-});
+}
 
 /**
- * Storage triggers must run in the bucket's region. The default bucket is in
- * us-east1. Callables stay on the global `asia-south1` option. The bucket
- * name is left unset so the emulator listens to `<project>.appspot.com` and
- * live listens to the default bucket from `FIREBASE_CONFIG`.
+ * Called from the us-east1 storage trigger. The bucket name is left to the
+ * trigger so the emulator listens to `<project>.appspot.com` and live listens
+ * to the default bucket from `FIREBASE_CONFIG`.
  */
-export const stripDownloadTokens = onObjectFinalized({ region: STORAGE_REGION }, async (event) => {
-  const name = event.data.name;
-  const bucketName = event.data.bucket;
+export async function stripFinalizedDownloadTokens(event: {
+  data?: { name?: string; bucket?: string };
+}): Promise<void> {
+  const name = event.data?.name;
+  const bucketName = event.data?.bucket;
   if (!name || !bucketName) return;
   await stripObjectTokens(bucketName, name);
-});
+}

@@ -89,6 +89,12 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /platformAdmins/{uid} {
+      allow get: if isSignedIn() && (isSelf(uid) || isActivePlatformAdmin());
+      allow list: if isActivePlatformAdmin();
+      allow create, update, delete: if false;
+    }
+
     match /auditLogs/{logId} {
       allow get, list: if isActivePlatformAdmin()
         || (

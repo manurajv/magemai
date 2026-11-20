@@ -14,8 +14,9 @@ describe("stripDownloadTokens trigger", () => {
       storageBucket: "demo-magemai.appspot.com",
     });
     process.env.GCLOUD_PROJECT = "demo-magemai";
-    const users = await import("../functions/src/users.ts");
-    endpoint = (users.stripDownloadTokens as unknown as { __endpoint: StorageEndpoint }).__endpoint;
+    const functions = await import("../functions/src/index.ts");
+    endpoint = (functions.stripDownloadTokens as unknown as { __endpoint: StorageEndpoint })
+      .__endpoint;
   });
 
   it("deploys in the bucket region and listens to the configured bucket", () => {

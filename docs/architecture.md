@@ -177,7 +177,7 @@ Phase 1 registers the routes it actually implements.
 | `/super-admin/categories` | Same | Coming soon |
 | `/super-admin/subscriptions` | Same | Coming soon |
 | `/super-admin/reports` | Same | Coming soon |
-| `/super-admin/settings` | Same | Coming soon |
+| `/super-admin/settings` | Same | Read-only view of `platformSettings/global`. Editing stays out of Phase 1. |
 
 `/register` creates a platform user. It does not create a customer record or a business. Customer account routes (`/account/…`) and public marketplace routes are added in Phase 3. `/business/register` must be declared as a static route so a later `/business/:slug` route cannot capture the word `register`.
 
@@ -1374,7 +1374,7 @@ Each item is a place the blueprint or the instructions left a choice open, or wh
 
 **Ambiguity.** The blueprint lists super-admin pages for categories, subscriptions, and reports. The Phase 1 scope lists users, businesses, verification, and audit.
 
-**Default.** Categories are seeded into `platformSettings/global` and are not editable in the UI. Subscriptions, reports, categories, and platform settings screens render Coming soon. Verification is a filter and actions on the business table.
+**Default.** Categories are seeded into `platformSettings/global` and are not editable in the UI. Subscriptions, reports, and categories render Coming soon. `/super-admin/settings` shows the seeded document and does not edit it. Verification is a filter and actions on the business table.
 
 **If overridden.** A category editor is a small screen plus `platform_settings.update` audit. It is still easy to leave until someone needs a new category, which the seed script can add.
 

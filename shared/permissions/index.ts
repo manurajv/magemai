@@ -41,3 +41,18 @@ export function roleHas(role: unknown, permission: BusinessPermission): boolean 
 export function roleLabel(role: BusinessRole): string {
   return role.slice(0, 1).toUpperCase() + role.slice(1);
 }
+
+export const platformPermissions = [
+  "platform.users.read",
+  "platform.businesses.read",
+  "platform.businesses.setStatus",
+  "platform.businesses.setVerification",
+  "platform.audit.read",
+  "platform.settings.read",
+] as const;
+
+export type PlatformPermission = (typeof platformPermissions)[number];
+
+export function isPlatformPermission(value: unknown): value is PlatformPermission {
+  return typeof value === "string" && (platformPermissions as readonly string[]).includes(value);
+}

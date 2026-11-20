@@ -64,4 +64,16 @@ describe("toolchain contract", () => {
     expect(names.join(" ").toLowerCase()).not.toContain("beyond gravity");
     expect(read("shared/platform/defaults.ts").toLowerCase()).not.toContain("beyond gravity");
   });
+
+  it("loads function handlers lazily and raises the discovery timeout", () => {
+    const index = read("functions/src/index.ts");
+    expect(index).not.toMatch(/from "\.\/business\.js"/);
+    expect(index).not.toMatch(/from "\.\/users\.js"/);
+    expect(index).toContain('import("./business.js")');
+    const pkg = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
+    expect(pkg.scripts["deploy:functions"]).toBe(
+      "node --experimental-strip-types scripts/deploy-functions.ts",
+    );
+    expect(read("scripts/deploy-functions.ts")).toContain("FUNCTIONS_DISCOVERY_TIMEOUT");
+  });
 });

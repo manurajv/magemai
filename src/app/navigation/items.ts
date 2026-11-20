@@ -50,12 +50,12 @@ export function visibleBusinessNavigation(role: BusinessRole): readonly NavItem[
 
 export const superAdminNavigation = [
   { label: "Overview", icon: Shield, to: "/super-admin" },
-  { label: "Users", icon: Users, comingSoon: true },
-  { label: "Businesses", icon: Briefcase, comingSoon: true },
-  { label: "Verifications", icon: Shield, comingSoon: true },
-  { label: "Audit logs", icon: FileText, comingSoon: true },
+  { label: "Users", icon: Users, to: "/super-admin/users" },
+  { label: "Businesses", icon: Briefcase, to: "/super-admin/businesses" },
+  { label: "Verifications", icon: Shield, to: "/super-admin/verifications" },
+  { label: "Audit logs", icon: FileText, to: "/super-admin/audit-logs" },
   { label: "Categories", icon: FolderKanban, comingSoon: true },
   { label: "Subscriptions", icon: Wallet, comingSoon: true },
   { label: "Reports", icon: BarChart3, comingSoon: true },
-  { label: "Platform settings", icon: LayoutDashboard, comingSoon: true },
+  { label: "Platform settings", icon: LayoutDashboard, to: "/super-admin/settings" },
 ] as const satisfies readonly NavItem[];
