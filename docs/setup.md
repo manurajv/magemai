@@ -195,7 +195,7 @@ In the Firebase console, before the first sign-in:
 
 1. Authentication → Sign-in method → enable Email/Password.
 2. Firestore → create the database in `asia-south1` if it does not exist. If it already exists in another region, stop and do not create a second database.
-3. Storage should already be the bucket named above.
+3. Storage is already the default bucket `magemai.firebasestorage.app` in `us-east1`. Leave it there. That location is the no-cost tier and is intentional. Do not create a second bucket in `asia-south1`. Avatar, logo, and cover bytes live in that US bucket. Firestore stays in `asia-south1`.
 
 Then:
 
@@ -234,6 +234,8 @@ npm run deploy:hosting
 npm run test:e2e:live
 npm run test:cleanup:live
 ```
+
+`deploy:functions` publishes the callables in `asia-south1` and `stripDownloadTokens` in `us-east1`. The trigger has to share the bucket region. Deploying it in `asia-south1` fails with "A function in region asia-south1 cannot listen to a bucket in region us-east1".
 
 `deploy:functions` does not publish `guardProviderSignIn`. That blocking function needs Identity Platform. Set `MAGEMAI_DEPLOY_BLOCKING_AUTH=true` in the same PowerShell window only after Identity Platform is enabled, then run `npm run deploy:functions` again. Until then, Google can attach to an existing password account.
 
@@ -288,14 +290,14 @@ The owner already has the only cloud project. Do not create a dev, staging, or p
 | Project number | `122706427013` |
 | Support email | `mavixas.ceo@gmail.com` |
 | Billing | Being upgraded to the Blaze plan by the owner |
-| Region | `asia-south1` (Mumbai) for Firestore and for Cloud Functions. Owner-approved. The Firestore location cannot be changed after the database is created. |
+| Region | `asia-south1` (Mumbai) for Firestore and for Cloud Functions. Owner-approved. The Firestore location cannot be changed after the database is created. The default Storage bucket stays in `us-east1` for the no-cost tier. Only `stripDownloadTokens` is deployed there. |
 | Assigned hostnames | `magemai.web.app` and `magemai.firebaseapp.com` |
 
 Confirm in the console that the project number is `122706427013` before running an operator script, so the credentials are for this project and not a different one named similarly.
 
-When Cloud Firestore is enabled, choose `asia-south1`. If the database already exists in another region, stop. Do not create a second database to work around it, and do not deploy Functions elsewhere. Tell the owner, because D13 is a locked decision.
+When Cloud Firestore is enabled, choose `asia-south1`. If the database already exists in another region, stop. Do not create a second database to work around it, and do not deploy the callables elsewhere. Tell the owner, because D13 is a locked decision.
 
-Enable Cloud Storage in the same region. Enable Authentication as in section 5. Add a web app in Project settings and copy the SDK config into the gitignored env file. Leave the values out of git. Hosting's GitHub integration is not required.
+Cloud Storage is already enabled as `magemai.firebasestorage.app` in `us-east1`. Leave that bucket where it is. Enable Authentication as in section 5. Add a web app in Project settings and copy the SDK config into the gitignored env file. `VITE_FIREBASE_STORAGE_BUCKET` is `magemai.firebasestorage.app`. Leave the values out of git. Hosting's GitHub integration is not required.
 
 ### 4.2 Local emulators
 
@@ -560,7 +562,7 @@ npm run seed:platform-settings
 npm run deploy:hosting
 ```
 
-`deploy:rules` publishes Firestore rules, the membership and creation indexes, and Storage rules. `deploy:functions` publishes the callables, including `createBusiness`, and leaves out the Identity Platform blocking function. `deploy:hosting` runs `npm run build` and publishes Hosting. `.firebaserc` already defaults to `magemai`. These scripts also pass `--project magemai`.
+`deploy:rules` publishes Firestore rules, the membership and creation indexes, and Storage rules. `deploy:functions` publishes the callables, including `createBusiness`, in `asia-south1`, and publishes `stripDownloadTokens` in `us-east1` so it can listen to `magemai.firebasestorage.app`. It leaves out the Identity Platform blocking function. `deploy:hosting` runs `npm run build` and publishes Hosting. `.firebaserc` already defaults to `magemai`. These scripts also pass `--project magemai`.
 
 Then:
 

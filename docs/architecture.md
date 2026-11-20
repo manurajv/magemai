@@ -5,7 +5,7 @@
 **Tagline:** Your business. Your own space.  
 **Status:** Phase 1 step 4 (foundation and design system) is in the repository. Authentication, onboarding, dashboard data, and super-admin behavior are not.  
 **Date:** 2026-11-16  
-**Revision:** Owner review of PR #1 approved the direction and locked the four decisions in section 3. Later the same review added the `platformAdmins` registry and named `magemai` as the only cloud project. On 2026-11-20 the app default changed to that live project ([section 24](#24-live-firebase-by-default)). Rules tests still use the Emulator Suite.  
+**Revision:** Owner review of PR #1 approved the direction and locked the four decisions in section 3. Later the same review added the `platformAdmins` registry and named `magemai` as the only cloud project. On 2026-11-20 the app default changed to that live project ([section 24](#24-live-firebase-by-default)). The same day the default Storage bucket was left in `us-east1` (section 16). Rules tests still use the Emulator Suite.  
 **Sources:** [Product blueprint](./magemai-blueprint.md) and the product owner's development instructions.
 
 This document is the architecture contract for Phase 1. Workflow steps 4–12 in [phase-1-checklist.md](./phase-1-checklist.md) implement this contract. [setup.md](./setup.md) is the environment guide.
@@ -50,7 +50,7 @@ The pilot business named in the blueprint is an ordinary tenant. It is created l
 | D10 | **Owner-approved.** Instants are Firestore timestamps (UTC). Each business stores an IANA timezone. Money, when it exists, is an integer minor-unit amount plus an ISO 4217 code. Phase 1 stores the currency code and no amounts. |
 | D11 | Deployed environments that run Functions are on the Blaze plan, with a budget alert before the first deploy. Local development uses the Emulator Suite and does not need Blaze. |
 | D12 | **Owner-approved.** No custom domain is configured. Hosting uses only the `web.app` and `firebaseapp.com` hostnames Firebase assigns to the project. |
-| D13 | **Owner-approved.** Firestore and Cloud Functions are located in `asia-south1` (Mumbai). |
+| D13 | **Owner-approved.** Firestore and Cloud Functions are located in `asia-south1` (Mumbai). The default Storage bucket is the later exception in section 16: it stays in `us-east1`, and only `stripDownloadTokens` follows it. |
 | D14 | One cloud Firebase project, `magemai` (number `122706427013`). From 2026-11-20 the app uses that live project unless `VITE_USE_FIREBASE_EMULATORS` is exactly `true`. Rules tests and CI Playwright stay on the Emulator Suite with project id `demo-magemai` (section 24). There is no dev, staging, or production project split. |
 
 The owner locked D3, D10, D12, and D13 in the review of PR #1. Later revisions do not reopen them. `platformAdmins` is another platform root collection under D3, not a new layout. D14 is the owner's later instruction about environments. During step 4 the owner kept Node.js 26.13.1 on the Windows development PC, so D2 now recommends Node 24 LTS and also accepts Node 26 for local app tooling. The deployed Functions runtime remains `nodejs24`. The trade-offs behind D3–D10 are in the sections below.
@@ -231,6 +231,8 @@ There is one cloud project, `magemai` (section 19). The app uses it unless the e
 
 The Functions region and the Firestore location are the same region, so callables do not pay cross-region reads. That region is `asia-south1` (Mumbai). The owner approved it (D13, [OQ-1](#oq-1-cloud-region)). A Firestore location cannot be changed later. When Firestore is enabled on `magemai`, the location must be `asia-south1`. If the database is already in another region, stop and tell the owner before writing data.
 
+The default Storage bucket is the exception. It is `magemai.firebasestorage.app` in `us-east1`, kept there for the no-cost Storage tier. Avatar, logo, and cover bytes live in that bucket. `stripDownloadTokens` is the only function deployed to `us-east1`, because a Storage trigger has to share the bucket's region. `setUserAvatar`, `setBusinessImage`, and every other callable stay in `asia-south1` and reach the object through the Admin SDK.
+
 Callable defaults: 256 MiB, 30 second timeout, minimum instances 0. Cold starts are acceptable in Phase 1. Raising minimum instances would bill continuously.
 
 ### 6.1 Function catalog
@@ -250,7 +252,7 @@ All callables require an authenticated user. Production deployments also require
 | `setUserAvatar` | That user | Same pattern for `users/{uid}/avatar`. |
 | `setBusinessStatus` | Active platform admin | `active` or `suspended`, audit with before and after. The function checks the claim and `platformAdmins/{uid}.status` on every call. |
 | `setBusinessVerification` | Active platform admin | Verification enum, audit with before and after. Same claim and registry check on every call. |
-| `stripDownloadTokens` | Storage trigger | Removes `firebaseStorageDownloadTokens` from every uploaded object. |
+| `stripDownloadTokens` | Storage trigger in `us-east1` | Removes `firebaseStorageDownloadTokens` from every uploaded object. Its region is `STORAGE_REGION`, not the `asia-south1` default. |
 
 There is no callable that sets custom claims. Adding one would create a path the provisioning design exists to avoid.
 
@@ -782,6 +784,10 @@ Single-field indexes that Firestore creates automatically are left automatic.
 
 ## 16. Storage rules strategy
 
+The live default bucket is `magemai.firebasestorage.app` in `us-east1`. That location is deliberate: it is the no-cost Storage tier, and the bucket stays there. Do not create a second bucket in `asia-south1`. Avatar, logo, and cover bytes live in the United States. Firestore and the other functions stay in `asia-south1`.
+
+The Storage emulator does not model that split. It stores objects in `<project>.appspot.com` (`demo-magemai.appspot.com` in tests). `defaultBucket()` in `functions/src/storage.ts` selects the appspot name when `FIREBASE_STORAGE_EMULATOR_HOST` is set. On the live project it selects `magemai.firebasestorage.app`, including when `FIREBASE_CONFIG` still names the legacy `magemai.appspot.com` bucket. The trigger itself does not hardcode a bucket, so the emulator listens to the appspot bucket and a live deploy listens to the default bucket.
+
 ### 16.1 Paths
 
 | Path | Phase 1 contents | Read | Write |
@@ -819,7 +825,7 @@ The Firebase client SDK attaches a `firebaseStorageDownloadTokens` metadata valu
 Phase 1 therefore:
 
 - Stores the object path only.
-- Runs `stripDownloadTokens` on finalize, and strips again inside `setBusinessImage` and `setUserAvatar`.
+- Runs `stripDownloadTokens` on finalize in `us-east1` (`STORAGE_REGION` in `shared/firebase/region.ts`), and strips again inside `setBusinessImage` and `setUserAvatar`, which stay in `asia-south1`.
 - Displays images by reading bytes through the SDK (`getBlob`) and creating an object URL.
 - Forbids `getDownloadURL` in application code. Step 10 includes a repository search for that call.
 
@@ -945,7 +951,8 @@ The owner will not create separate development or staging Firebase projects. `ma
 | Project number | `122706427013` |
 | Support email | `mavixas.ceo@gmail.com` |
 | Billing | The owner is upgrading this project to Blaze. Budget alerts are required before the first functions deploy (section 22). |
-| Firestore and Functions region | `asia-south1` (D13) |
+| Firestore and Functions region | `asia-south1` (D13). `stripDownloadTokens` is the exception, in `us-east1`. |
+| Storage bucket | `magemai.firebasestorage.app` in `us-east1` (no-cost tier) |
 | Assigned hostnames | `magemai.web.app` and `magemai.firebaseapp.com` |
 | App default | live project `magemai` |
 
@@ -1104,9 +1111,9 @@ Step 4 wired the scripts in section 24.11. `npm run test:rules` currently checks
 
 ## 21. Deployment strategy
 
-There is one deploy target: project `magemai`, region `asia-south1`. CI does not deploy. The owner runs the npm scripts below from their PC. They do not prompt for a typed project id.
+There is one deploy target: project `magemai`. Firestore and Cloud Functions are in `asia-south1`, except `stripDownloadTokens`, which deploys to `us-east1` with the Storage bucket. CI does not deploy. The owner runs the npm scripts below from their PC. They do not prompt for a typed project id.
 
-1. In the console, enable the Email/Password provider. Create Firestore in `asia-south1` if it does not exist. Stop if it already exists in another region.
+1. In the console, enable the Email/Password provider. Create Firestore in `asia-south1` if it does not exist. Stop if it already exists in another region. Leave the default Storage bucket `magemai.firebasestorage.app` in `us-east1`. A function in `asia-south1` cannot listen to that bucket.
 2. Confirm Blaze and the budget alerts in section 22 before the first functions deploy. This document does not enable billing.
 3. `npm run deploy:rules` deploys Firestore rules, Firestore indexes, and Storage rules.
 4. `npm run deploy:functions` deploys functions. It does not deploy `guardProviderSignIn` unless `MAGEMAI_DEPLOY_BLOCKING_AUTH=true`.
@@ -1130,7 +1137,7 @@ Auth settings on `magemai`: email/password enabled, Google enabled when the OAut
 
 - Authentication with email/password and Google.
 - Cloud Firestore, within the Spark quota. Exceeding a Spark quota turns that product off until the next month or until the project moves to Blaze.
-- Cloud Storage and Hosting, within their Spark quotas.
+- Cloud Storage and Hosting, within their Spark quotas. The default bucket stays in `us-east1` for that no-cost location.
 - Security rules.
 - The Emulator Suite, including running Functions locally. Emulators do not bill.
 
@@ -1165,6 +1172,8 @@ Each item is a place the blueprint or the instructions left a choice open, or wh
 **Status.** Approved. Closed. Decision D13.
 
 **Decision.** `asia-south1` (Mumbai) for Firestore and for Functions. It is the closest common single region to Sri Lanka. A multi-region location costs more and is not justified before launch traffic. The Firestore location is permanent. Enable it on `magemai` only in this region.
+
+**Storage exception, recorded 2026-11-20.** The default bucket `magemai.firebasestorage.app` was created in `us-east1` and stays there for the no-cost Storage tier. Avatar bytes live in the United States. Only `stripDownloadTokens` is deployed to `us-east1`. Moving that trigger back to `asia-south1` fails deploy with "A function in region asia-south1 cannot listen to a bucket in region us-east1".
 
 ### OQ-2. Money units
 
@@ -1382,7 +1391,7 @@ These defaults are enough to implement Phase 1 without another architecture pass
 
 ## 24. Live Firebase by default
 
-On 2026-11-20 the owner dropped the emulator-first default. The app uses the live project `magemai` unless `VITE_USE_FIREBASE_EMULATORS` is exactly `true`. He could not run the emulators on his PC and does not want them for day-to-day work. There is still one cloud project (D14) and no dev or staging project. D3, D10, D12, and D13 are unchanged.
+On 2026-11-20 the owner dropped the emulator-first default. The app uses the live project `magemai` unless `VITE_USE_FIREBASE_EMULATORS` is exactly `true`. He could not run the emulators on his PC and does not want them for day-to-day work. There is still one cloud project (D14) and no dev or staging project. D3, D10, D12, and D13 are unchanged. The same day the default Storage bucket was left in `us-east1` (section 16).
 
 Rules tests stay on the Emulator Suite because `@firebase/rules-unit-testing` only works there. `npm run test:e2e` also stays on the emulators so CI can run without live credentials. `npm run test:e2e:live` is the operator command for project `magemai`. It is not part of CI, and it cannot pass until rules, indexes, and functions are deployed.
 
@@ -1403,7 +1412,7 @@ Emulator scripts still pass `--project demo-magemai`. Deploy scripts pass `--pro
 
 `emulators.singleProjectMode` is `true`. The suite then answers only one project id. Scripts always pass `--project demo-magemai`. A request that names `magemai` is refused by the suite and by the script guard in 24.7.
 
-The Functions client is constructed for region `asia-south1` (D13) in every mode. The emulator still listens on `127.0.0.1:5001`. The region is the callable path, not a second cloud project.
+The Functions client is constructed for region `asia-south1` (D13) in every mode. The emulator still listens on `127.0.0.1:5001`. The region is the callable path, not a second cloud project. `stripDownloadTokens` is declared with region `us-east1`. The emulator delivers Storage events by bucket name, not by that region, and the bucket it creates is `demo-magemai.appspot.com`. The live client bucket is `magemai.firebasestorage.app` from gitignored `.env.local`.
 
 ### 24.2 Local services use the emulator endpoints
 

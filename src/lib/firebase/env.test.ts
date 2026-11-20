@@ -94,9 +94,9 @@ describe("assertProductionBuildHasNoEmulators", () => {
 describe("firebaseWebConfig", () => {
   it("fills emulator placeholders and forces the demo project id", () => {
     const access = resolveFirebaseAccess(env({ useEmulators: "true" }));
-    expect(firebaseWebConfig(env({ useEmulators: "true" }), access).projectId).toBe(
-      DEMO_PROJECT_ID,
-    );
+    const config = firebaseWebConfig(env({ useEmulators: "true" }), access);
+    expect(config.projectId).toBe(DEMO_PROJECT_ID);
+    expect(config.storageBucket).toBe("demo-magemai.appspot.com");
   });
 
   it("requires the public web config for live access", () => {

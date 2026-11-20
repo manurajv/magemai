@@ -1,5 +1,5 @@
 import { region } from "firebase-functions/v1";
-import { FUNCTIONS_REGION } from "../../shared/firebase/region.js";
+import { FUNCTIONS_REGION, STORAGE_REGION } from "../../shared/firebase/region.js";
 import "./admin.js";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
@@ -134,7 +134,13 @@ export const setUserAvatar = onCall(async (request) => {
   return { photoPath: path };
 });
 
-export const stripDownloadTokens = onObjectFinalized(async (event) => {
+/**
+ * Storage triggers must run in the bucket's region. The default bucket is in
+ * us-east1. Callables stay on the global `asia-south1` option. The bucket
+ * name is left unset so the emulator listens to `<project>.appspot.com` and
+ * live listens to the default bucket from `FIREBASE_CONFIG`.
+ */
+export const stripDownloadTokens = onObjectFinalized({ region: STORAGE_REGION }, async (event) => {
   const name = event.data.name;
   const bucketName = event.data.bucket;
   if (!name || !bucketName) return;

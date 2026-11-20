@@ -12,7 +12,7 @@ Phase 1 step 6 (business onboarding) is in this repository. The app uses the liv
 
 Phase 2 and later stay out of scope until the Phase 1 acceptance criteria pass.
 
-Nothing in this change deploys to `magemai` or enables billing. The owner deploys from their PC with `deploy:rules`, `deploy:functions`, and `deploy:hosting`. See [docs/setup.md](docs/setup.md).
+Nothing in this change deploys to `magemai` or enables billing. The owner deploys from their PC with `deploy:rules`, `deploy:functions`, and `deploy:hosting`. The Storage bucket stays in `us-east1`. `stripDownloadTokens` deploys there; the other functions stay in `asia-south1`. See [docs/setup.md](docs/setup.md).
 
 ## Local development
 

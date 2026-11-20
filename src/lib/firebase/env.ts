@@ -91,7 +91,9 @@ export function firebaseWebConfig(env: FirebaseClientEnv, access: FirebaseAccess
       apiKey: env.apiKey || "demo-api-key",
       authDomain: env.authDomain || "demo-magemai.firebaseapp.com",
       projectId: DEMO_PROJECT_ID,
-      storageBucket: env.storageBucket || "demo-magemai.appspot.com",
+      // The Storage emulator's bucket is always `{project}.appspot.com`.
+      // The live bucket `magemai.firebasestorage.app` comes from `.env.local`.
+      storageBucket: env.storageBucket || `${DEMO_PROJECT_ID}.appspot.com`,
       messagingSenderId: env.messagingSenderId || "demo-sender",
       appId: env.appId || "demo-app-id",
     };
