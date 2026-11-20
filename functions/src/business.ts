@@ -261,9 +261,16 @@ export async function setBusinessImage(request: CallableRequest) {
   }
   const businessRef = db.doc(`businesses/${businessId}`);
   const business = await businessRef.get();
-  const status = business.get("status");
-  if (!business.exists || (status !== "active" && status !== "suspended")) {
-    throw new HttpsError("failed-precondition", "This business cannot be updated.");
+  if (!business.exists) {
+    throw new HttpsError("not-found", "This business was not found.");
+  }
+  if (business.get("status") !== "active") {
+    throw new HttpsError(
+      "failed-precondition",
+      business.get("status") === "suspended"
+        ? "This business is suspended. Editing is turned off."
+        : "This business cannot be updated.",
+    );
   }
   const objectPath = `businesses/${businessId}/brand/${kind}`;
   const bucket = defaultBucket();

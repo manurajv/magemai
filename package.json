@@ -17,6 +17,8 @@
     "test": "vitest run",
     "test:rules": "node scripts/emulators.mjs exec -- vitest run --config vitest.rules.config.ts",
     "test:e2e": "node scripts/emulators.mjs exec -- playwright test",
+    "test:all": "node scripts/emulators.mjs exec -- npm run test:all:suite",
+    "test:all:suite": "npm test && vitest run --config vitest.rules.config.ts && playwright test",
     "test:e2e:live": "playwright test --config playwright.live.config.ts",
     "test:cleanup:live": "node scripts/cleanup-live-e2e.mjs",
     "seed:platform-settings": "node scripts/seed-platform-settings.mjs",

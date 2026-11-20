@@ -86,6 +86,9 @@ test("register, verify, profile, logout, and password reset", async ({
   await page.getByRole("button", { name: "Account" }).click();
   await page.getByRole("menuitem", { name: "Sign out" }).click();
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await page.goto("/admin");
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toHaveCount(0);
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem("magemai.activeBusinessId")))
     .toBeNull();
@@ -115,10 +118,19 @@ test("register, verify, profile, logout, and password reset", async ({
   await expect(page.getByRole("heading", { name: "Create a business" })).toBeVisible();
 });
 
-test("google redirect is offered when the flag is on", async ({ page }) => {
+test("google sign-in completes through the auth emulator", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "The emulator provider runs once on desktop.");
+  const email = `google.${Date.now()}@example.test`;
   await page.goto("/login");
   const google = page.getByRole("button", { name: "Continue with Google" });
   await expect(google).toBeVisible();
   await google.click();
   await page.waitForURL(/127\.0\.0\.1:9099/, { timeout: 20_000 });
+  await page.getByRole("button", { name: "Add new account" }).click();
+  await page.locator("#email-input").fill(email);
+  await page.locator("#sign-in").click();
+  await page.waitForURL(/127\.0\.0\.1:5173/, { timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Create a business" })).toBeVisible({
+    timeout: 20_000,
+  });
 });

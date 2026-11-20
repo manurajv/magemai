@@ -80,6 +80,27 @@ test("a super-admin suspends a business and the owner sees the banner", async ({
   await expect(page.getByLabel("Business name")).toBeDisabled();
 });
 
+test("a session from before the grant can check again", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "The token refresh runs once on desktop.");
+  const email = "late.grant@example.test";
+  const uid = await ensureVerifiedUser(email, password, "Late");
+  await seedMembership({
+    uid,
+    email,
+    businessId: "late-studio",
+    name: "Late Studio",
+    slug: "late-studio",
+  });
+  await signIn(page, email);
+  await page.goto("/super-admin");
+  await expect(page.getByRole("heading", { name: "Platform access denied" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Check again" })).toBeVisible();
+  await expect(page.getByText(/sign out and sign back in/i)).toBeVisible();
+  await grantPlatformAdmin(uid, email);
+  await page.getByRole("button", { name: "Check again" }).click();
+  await expect(page.getByRole("heading", { name: "Platform" })).toBeVisible();
+});
+
 test("a revoked registry denies the user list while the token still has the claim", async ({
   page,
 }, testInfo) => {

@@ -27,6 +27,11 @@ service firebase.storage {
         && memberDoc(businessId).data.role in ['owner', 'admin', 'manager'];
     }
 
+    function businessIsActive(businessId) {
+      return firestore.exists(/databases/(default)/documents/businesses/$(businessId))
+        && firestore.get(/databases/(default)/documents/businesses/$(businessId)).data.status == 'active';
+    }
+
     function isBrandImage(maxBytes) {
       return request.resource != null
         && request.resource.contentType.matches('image/(jpeg|png|webp)')
@@ -41,12 +46,16 @@ service firebase.storage {
 
     match /businesses/{businessId}/brand/logo {
       allow read: if isActiveMember(businessId);
-      allow write: if isBrandEditor(businessId) && isBrandImage(2 * 1024 * 1024);
+      allow write: if isBrandEditor(businessId)
+        && businessIsActive(businessId)
+        && isBrandImage(2 * 1024 * 1024);
     }
 
     match /businesses/{businessId}/brand/cover {
       allow read: if isActiveMember(businessId);
-      allow write: if isBrandEditor(businessId) && isBrandImage(5 * 1024 * 1024);
+      allow write: if isBrandEditor(businessId)
+        && businessIsActive(businessId)
+        && isBrandImage(5 * 1024 * 1024);
     }
 
     match /businesses/{businessId}/private/{allPaths=**} {
