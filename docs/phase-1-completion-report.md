@@ -149,10 +149,11 @@ After the callable and email-verification fixes, the commands in the table were 
 
 GitHub Actions on `928b48d` failed `XT-21` in `tests/rules/platform-admin.test.ts` at Vitest's 5 second default. The callable had returned; the cold Functions emulator made that first call too slow. The rules config now allows 20 seconds for a test.
 
+[Actions run 44793554030](https://github.com/manurajv/magemai/actions/runs/44793554030) on `220bdad` passed `npm run test:all` with no service-account credentials. That one command reported 26 files and 107 unit tests, 8 files and 48 rules tests, and Playwright 29 passed with 16 skipped.
+
 Not run:
 
 - `npm run test:e2e:live` and `npm run test:cleanup:live`. They talk to project `magemai`.
-- `npm run test:all` as a single command. Unit tests, rules tests, and Playwright were run separately. The CI workflow [`.github/workflows/tests.yml`](../.github/workflows/tests.yml) calls `npm run test:all` and does not receive service-account credentials. GitHub Actions was not executed from this machine.
 - Live Google sign-in on `magemai`.
 
 The Functions emulator warned that the host Node is 26 while the runtime is 24. That warning is expected and was not a failure.
@@ -174,5 +175,4 @@ Install, emulators, env names, provisioning, and deploy are in [setup.md](./setu
 - The owner deploys rules, functions, and hosting.
 - Close AC-2 with a non-destructive Google sign-in on `magemai` when the owner wants that check.
 - Confirm on a live object that the download token is gone after finalize.
-- Let GitHub Actions run `npm run test:all` on the pull request.
 - Continue with Phase 2 only when the owner asks for it.

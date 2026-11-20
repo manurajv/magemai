@@ -258,7 +258,7 @@ Maps to AC-16 and AC-17. Also re-runs the flows behind AC-1 through AC-15.
 - [x] E2E: the audit list shows the suspension.
 - [x] E2E: Google sign-in through the Auth emulator's simulated provider. The emulator account list asks for "Add new account" before the email field.
 - [ ] Manual, only if Google sign-in is enabled on `magemai` and the owner agrees to a non-destructive sign-in check: Google sign-in against that project. If it was not run, leave AC-2's real-provider half documented as not run. Do not mark it passed. Do not create or delete businesses on `magemai` as part of the test run.
-- [x] Add the CI entry point `npm run test:all` that runs unit tests, rules tests, and Playwright under the emulators. The three parts were run separately. `npm run test:all` itself was not executed as one command, and GitHub Actions was not executed from this machine.
+- [x] Add the CI entry point `npm run test:all` that runs unit tests, rules tests, and Playwright under the emulators. GitHub Actions run 44793554030 on `220bdad` passed that command: 26 files and 107 unit tests, 8 files and 48 rules tests, and Playwright 29 passed with 16 skipped.
 - [x] Add a CI workflow that runs `npm run test:all` without service-account credentials.
 - [x] Fix failures. Do not bypass a rule to make a test pass.
 - [x] `npm test`, `npm run test:rules`, `npm run test:e2e`, and the production build are green locally (AC-17). The production build was run with the public config names supplied in the environment. No env file was committed.
