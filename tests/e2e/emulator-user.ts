@@ -1,4 +1,4 @@
-import { getApps, initializeApp } from "firebase-admin/app";
+import { getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import type { APIRequestContext } from "@playwright/test";
@@ -6,26 +6,24 @@ import { platformDefaults } from "../../shared/platform/defaults.ts";
 
 process.env.METADATA_SERVER_DETECTION ??= "none";
 
-function adminAuth() {
+function emulatorApp(refusal: string): App {
   const projectId =
     process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? "demo-magemai";
-  if (projectId === "magemai") {
-    throw new Error("Refusing to create an emulator user for the live project.");
-  }
-  if (getApps().length === 0) initializeApp({ projectId });
-  return getAuth();
+  if (projectId === "magemai") throw new Error(refusal);
+  return getApps()[0] ?? initializeApp({ projectId });
+}
+
+function adminAuth() {
+  return getAuth(emulatorApp("Refusing to create an emulator user for the live project."));
 }
 
 export async function seedPlatformSettings() {
-  const projectId =
-    process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? "demo-magemai";
-  if (projectId === "magemai") {
-    throw new Error(
+  const db = getFirestore(
+    emulatorApp(
       "Refusing to seed platform settings for the live project from the emulator helper.",
-    );
-  }
-  if (getApps().length === 0) initializeApp({ projectId });
-  await getFirestore()
+    ),
+  );
+  await db
     .doc("platformSettings/global")
     .set({ ...platformDefaults, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
 }
@@ -40,11 +38,7 @@ export async function seedMembership(input: {
   status?: "active" | "suspended";
   createdAtMs?: number;
 }) {
-  const projectId =
-    process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? "demo-magemai";
-  if (projectId === "magemai") throw new Error("Refusing to seed a live business.");
-  if (getApps().length === 0) initializeApp({ projectId });
-  const db = getFirestore();
+  const db = getFirestore(emulatorApp("Refusing to seed a live business."));
   const role = input.role ?? "owner";
   const createdAt = new Date(input.createdAtMs ?? Date.now());
   await db.doc(`users/${input.uid}`).set(
@@ -116,13 +110,9 @@ export async function seedMembership(input: {
 }
 
 export async function grantPlatformAdmin(uid: string, email: string) {
-  const projectId =
-    process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? "demo-magemai";
-  if (projectId === "magemai")
-    throw new Error("Refusing to grant platform access on the live project.");
-  if (getApps().length === 0) initializeApp({ projectId });
-  await getAuth().setCustomUserClaims(uid, { superAdmin: true });
-  const db = getFirestore();
+  const app = emulatorApp("Refusing to grant platform access on the live project.");
+  await getAuth(app).setCustomUserClaims(uid, { superAdmin: true });
+  const db = getFirestore(app);
   await db.doc(`users/${uid}`).set(
     {
       id: uid,
@@ -151,12 +141,8 @@ export async function grantPlatformAdmin(uid: string, email: string) {
 }
 
 export async function revokePlatformRegistry(uid: string) {
-  const projectId =
-    process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? "demo-magemai";
-  if (projectId === "magemai")
-    throw new Error("Refusing to revoke platform access on the live project.");
-  if (getApps().length === 0) initializeApp({ projectId });
-  await getFirestore().doc(`platformAdmins/${uid}`).set(
+  const db = getFirestore(emulatorApp("Refusing to revoke platform access on the live project."));
+  await db.doc(`platformAdmins/${uid}`).set(
     {
       status: "revoked",
       revokedBy: "emulator-test",

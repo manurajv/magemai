@@ -8,9 +8,9 @@ Magemai is a multi-tenant platform for service businesses. Each business gets it
 
 ## Status
 
-Phase 1 step 6 (business onboarding) is in this repository. The app uses the live Firebase project `magemai` unless `VITE_USE_FIREBASE_EMULATORS` is `true`. Email and password registration, profiles, and the business wizard are implemented. Dashboard data, business switching, and super-admin behavior are not.
+Phase 1 (foundation and identity) is implemented in this repository: accounts, onboarding, the business dashboard, and platform administration. The app uses the live Firebase project `magemai` unless `VITE_USE_FIREBASE_EMULATORS` is `true`. The acceptance criteria and the commands that were run are in [docs/phase-1-completion-report.md](docs/phase-1-completion-report.md). Real Google sign-in against `magemai` has not been run.
 
-Phase 2 and later stay out of scope until the Phase 1 acceptance criteria pass.
+Phase 2 and later stay out of scope until that report's open criteria are closed and the owner asks for the next phase.
 
 Nothing in this change deploys to `magemai` or enables billing. The owner deploys from their PC with `deploy:rules`, `deploy:functions`, and `deploy:hosting`. The Storage bucket stays in `us-east1`. `stripDownloadTokens` deploys there; the other functions stay in `asia-south1`. See [docs/setup.md](docs/setup.md).
 

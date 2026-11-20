@@ -1,5 +1,5 @@
-import "./admin.js";
 import { getAuth } from "firebase-admin/auth";
+import { adminApp } from "./admin.js";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import {
@@ -7,16 +7,18 @@ import {
   setBusinessVerificationSchema,
 } from "../../shared/validation/platform.js";
 
+adminApp();
+
 export async function assertActivePlatformAdmin(request: CallableRequest): Promise<string> {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Sign in before continuing.");
   }
   const uid = request.auth.uid;
-  const user = await getAuth().getUser(uid);
+  const user = await getAuth(adminApp()).getUser(uid);
   if (user.disabled || user.customClaims?.superAdmin !== true) {
     throw new HttpsError("permission-denied", "Platform access is required.");
   }
-  const registry = await getFirestore().doc(`platformAdmins/${uid}`).get();
+  const registry = await getFirestore(adminApp()).doc(`platformAdmins/${uid}`).get();
   if (!registry.exists || registry.get("status") !== "active") {
     throw new HttpsError("permission-denied", "Platform access is required.");
   }
@@ -37,7 +39,7 @@ async function changeBusiness(
   field: "status" | "verificationStatus",
   next: string,
 ): Promise<BusinessChange> {
-  const db = getFirestore();
+  const db = getFirestore(adminApp());
   const businessRef = db.doc(`businesses/${businessId}`);
   const auditRef = db.collection("auditLogs").doc();
   const now = FieldValue.serverTimestamp();

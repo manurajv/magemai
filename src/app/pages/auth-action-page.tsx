@@ -1,21 +1,32 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { applyActionCode, confirmPasswordReset } from "firebase/auth";
 import { useForm } from "react-hook-form";
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { resetPasswordSchema, type ResetPasswordInput } from "@shared/validation/auth";
+import { useAuth } from "@/app/providers/auth-context";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { mapAuthError } from "@/lib/auth/errors";
+import {
+  EMAIL_VERIFIED_MESSAGE,
+  finishEmailVerification,
+  type VerificationOutcome,
+} from "@/lib/auth/email-link";
 import { getFirebase } from "@/lib/firebase/client";
+
+const verificationAttempts = new Map<string, Promise<VerificationOutcome>>();
 
 export function AuthActionPage() {
   useDocumentTitle("Account link");
   const [params] = useSearchParams();
   const mode = params.get("mode");
   const code = params.get("oobCode");
+  const flow = params.get("flow");
+  const navigate = useNavigate();
+  const auth = useAuth();
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -23,6 +34,64 @@ export function AuthActionPage() {
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: { password: "" },
   });
+  const verifying = mode === "verifyEmail" || flow === "verifyEmail";
+  const reloadUser = useRef(auth.reloadUser);
+  reloadUser.current = auth.reloadUser;
+
+  useEffect(() => {
+    if (!verifying) return;
+    let cancelled = false;
+    setSubmitting(true);
+    setError(null);
+    const key = `${mode ?? ""}:${code ?? ""}:${flow ?? ""}`;
+    const attempt =
+      verificationAttempts.get(key) ??
+      finishEmailVerification({
+        mode,
+        code,
+        flow,
+        applyCode: (oobCode) => applyActionCode(getFirebase().auth, oobCode),
+        currentUser: () => getFirebase().auth.currentUser,
+      });
+    verificationAttempts.set(key, attempt);
+    void attempt
+      .then(async (outcome) => {
+        if (cancelled) return;
+        if (outcome === "still-unverified") {
+          setError("This address is not verified yet.");
+          return;
+        }
+        if (outcome === "app") await reloadUser.current();
+        if (cancelled) return;
+        setDone(EMAIL_VERIFIED_MESSAGE);
+        window.setTimeout(() => {
+          if (!cancelled) navigate(outcome === "app" ? "/admin" : "/login", { replace: true });
+        }, 400);
+      })
+      .catch((caught: unknown) => {
+        if (!cancelled) setError(mapAuthError(caught));
+      })
+      .finally(() => {
+        if (!cancelled) setSubmitting(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [code, flow, mode, navigate, verifying]);
+
+  if (verifying) {
+    return (
+      <div className="flex flex-col gap-4">
+        <PageHeader title="Confirm your email" description="This marks the address as verified." />
+        {submitting ? <p role="status">Confirming your email…</p> : null}
+        {done ? <p role="status">{done}</p> : null}
+        {error ? <p role="alert">{error}</p> : null}
+        <Link to="/login" className="text-sm text-primary underline-offset-4 hover:underline">
+          Sign in
+        </Link>
+      </div>
+    );
+  }
 
   if (!code) {
     return (
@@ -30,39 +99,6 @@ export function AuthActionPage() {
         title="This link is incomplete"
         description="Request a new email from the sign-in page."
       />
-    );
-  }
-
-  if (mode === "verifyEmail") {
-    return (
-      <div className="flex flex-col gap-4">
-        <PageHeader
-          title="Confirm your email"
-          description="This marks the address as verified in the emulator or the live project."
-        />
-        {done ? <p role="status">{done}</p> : null}
-        {error ? <p role="alert">{error}</p> : null}
-        <Button
-          type="button"
-          disabled={submitting || done !== null}
-          onClick={() => {
-            setSubmitting(true);
-            setError(null);
-            void applyActionCode(getFirebase().auth, code)
-              .then(() => setDone("Email verified. Return to the app and choose I've verified."))
-              .catch((caught: unknown) => setError(mapAuthError(caught)))
-              .finally(() => setSubmitting(false));
-          }}
-        >
-          {submitting ? "Confirming…" : "Confirm email"}
-        </Button>
-        <Link
-          to="/verify-email"
-          className="text-sm text-primary underline-offset-4 hover:underline"
-        >
-          Back to verification
-        </Link>
-      </div>
     );
   }
 

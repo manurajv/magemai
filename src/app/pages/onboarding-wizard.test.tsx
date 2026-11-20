@@ -38,7 +38,7 @@ function renderWizard(needsDisplayName = false) {
 
 async function fillIdentity(user: ReturnType<typeof userEvent.setup>, name: string, slug: string) {
   await user.type(screen.getByLabelText("Business name"), name);
-  const address = screen.getByLabelText("Web address");
+  const address = screen.getByLabelText("Magemai booking link");
   await user.clear(address);
   await user.type(address, slug);
 }
@@ -52,15 +52,42 @@ describe("onboarding wizard", () => {
     expect(screen.getByText(/Step 1 of 7/)).toBeInTheDocument();
   });
 
-  it("suggests a web address and reviews the business before creating it", async () => {
+  it("does not show a booking-link error before the field is used", () => {
+    renderWizard();
+    expect(screen.queryByText("Use at least 3 characters.")).not.toBeInTheDocument();
+    expect(screen.getByText("https://magemai.web.app/business/your-link")).toBeInTheDocument();
+  });
+
+  it("suggests a booking link while the name is typed and keeps a manual edit", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+    await user.type(screen.getByLabelText("Business name"), "Te");
+    expect(screen.queryByText("Use at least 3 characters.")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Magemai booking link")).toHaveValue("");
+    await user.type(screen.getByLabelText("Business name"), "st Studio");
+    const link = screen.getByLabelText("Magemai booking link");
+    expect(link).toHaveValue("test-studio");
+    expect(screen.getByText("https://magemai.web.app/business/test-studio")).toBeInTheDocument();
+    expect(screen.getByText(/This is not your own website/)).toBeInTheDocument();
+    await user.clear(link);
+    await user.type(link, "custom-studio");
+    await user.type(screen.getByLabelText("Business name"), " Extra");
+    expect(link).toHaveValue("custom-studio");
+  });
+
+  it("suggests a booking link and reviews the business before creating it", async () => {
     const user = userEvent.setup();
     const { onCheckSlug, onCreate } = renderWizard();
     await user.type(screen.getByLabelText("Business name"), "Test Studio");
-    await user.tab();
-    expect(screen.getByLabelText("Web address")).toHaveValue("test-studio");
+    expect(screen.getByLabelText("Magemai booking link")).toHaveValue("test-studio");
+    expect(screen.queryByText("Use at least 3 characters.")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(onCheckSlug).toHaveBeenCalledWith("test-studio");
     await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByLabelText("Your own website")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Leave this blank if the business does not have its own website/),
+    ).toBeInTheDocument();
     await user.type(screen.getByLabelText("Contact email"), "studio@example.test");
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.type(screen.getByLabelText("Address line 1"), "1 Galle Road");
@@ -70,7 +97,7 @@ describe("onboarding wizard", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("No logo selected.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.getByText("test-studio")).toBeInTheDocument();
+    expect(screen.getByText("https://magemai.web.app/business/test-studio")).toBeInTheDocument();
     expect(screen.getByText("Photography")).toBeInTheDocument();
     expect(screen.getByText("studio@example.test")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Create business" }));

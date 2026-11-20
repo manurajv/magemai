@@ -236,9 +236,18 @@ describe("platform admin callables", () => {
     ).toBe("pending");
   });
 
-  it("XT-22 and XT-23 deny setBusinessStatus without an active registry", async () => {
+  it("XT-11, XT-22, and XT-23 deny setBusinessStatus without an active registry", async () => {
     const person = await signIn(`person-${Date.now()}@example.test`, null);
     const businessId = await seedBusiness(person);
+    await getAdminFirestore()
+      .doc(`businessMembers/${businessId}_${person}`)
+      .set({
+        id: `${businessId}_${person}`,
+        businessId,
+        userId: person,
+        role: "owner",
+        status: "active",
+      });
     const call = httpsCallable(getFunctions(app, "asia-south1"), "setBusinessStatus");
     await expect(call({ businessId, status: "suspended" })).rejects.toThrow(/platform access/i);
 

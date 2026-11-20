@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { bookingPageUrl } from "@shared/business/booking-url";
 import { countries } from "@shared/data/countries";
 import { roleHas } from "@shared/permissions";
 import { businessProfileSchema, type BusinessProfileInput } from "@shared/validation/business";
@@ -143,11 +144,13 @@ function BusinessProfileForm({
         title="Business profile"
         description={
           editable
-            ? "These details describe the business. The web address cannot be changed here."
+            ? "These details describe the business. The Magemai booking link cannot be changed here."
             : "You can read this profile. Your role cannot change it."
         }
       />
-      <p className="text-sm text-muted-foreground">Web address: {business.slug}</p>
+      <p className="text-sm text-muted-foreground">
+        Magemai booking link: {bookingPageUrl(business.slug)}
+      </p>
       <Input
         label="Business name"
         disabled={!editable}
@@ -186,7 +189,8 @@ function BusinessProfileForm({
         {...form.register("contact.phone")}
       />
       <Input
-        label="Website"
+        label="Your own website"
+        hint="Optional. This is the business's own website, not the Magemai booking link."
         disabled={!editable}
         error={form.formState.errors.contact?.website?.message}
         {...form.register("contact.website")}

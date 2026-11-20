@@ -14,7 +14,7 @@ type HeaderProps = {
 export function Header({ onOpenSidebar }: HeaderProps) {
   const auth = useAuth();
   const navigate = useNavigate();
-  const platformClaim = useSuperAdminClaim(auth.user?.uid ?? null);
+  const platformClaim = useSuperAdminClaim(auth.user?.uid ?? null).claim;
   const items = auth.user
     ? [
         { label: "Profile", onSelect: () => navigate("/profile") },

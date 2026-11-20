@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { bookingPageUrl } from "@shared/business/booking-url";
 import { suggestSlug } from "@shared/business/slug";
 import { businessInputSchema, businessSettingsError } from "@shared/validation/business";
 import { platformDefaults } from "@shared/platform/defaults";
@@ -41,6 +42,10 @@ describe("business slug suggestion", () => {
     expect(suggestSlug("ස්ටුඩියෝ")).toBe("");
     expect(suggestSlug("123")).toBe("");
   });
+
+  it("builds the public booking page from the blueprint path", () => {
+    expect(bookingPageUrl("Test-Studio")).toBe("https://magemai.web.app/business/test-studio");
+  });
 });
 
 describe("business input schema", () => {
@@ -57,6 +62,16 @@ describe("business input schema", () => {
     expect(parsed).not.toHaveProperty("status");
     expect(parsed).not.toHaveProperty("ownerId");
     expect(businessSettingsError(parsed, settings)).toBeNull();
+  });
+
+  it("accepts a blank website and an https website", () => {
+    expect(businessInputSchema.safeParse(validInput()).success).toBe(true);
+    expect(
+      businessInputSchema.safeParse({
+        ...validInput(),
+        contact: { ...validInput().contact, website: "https://studio.example" },
+      }).success,
+    ).toBe(true);
   });
 
   it("rejects a bad website, an unknown country, and an unknown time zone", () => {

@@ -163,7 +163,7 @@ Phase 1 registers the routes it actually implements.
 | `/register` | public | Create a user account |
 | `/forgot-password` | public | Send a reset email |
 | `/verify-email` | signed-in, unverified | Holding screen and resend |
-| `/auth/action` | public | Applies an email-verification or password-reset code |
+| `/auth/action` | public | Applies an email-verification or password-reset code, or confirms a hosted verification and continues |
 | `/profile` | signed-in | Personal profile. Not a business membership |
 | `/business/register` | verified user | Onboarding wizard. Step 5 keeps a placeholder on this path |
 | `/admin` | member | Overview |
@@ -405,7 +405,7 @@ Every Phase 1 timestamp field below is a Firestore `Timestamp` written with `Fie
 - `list`: an active platform admin only. A member loads their businesses by id after reading their own memberships. A collection query of `businesses` would be rejected for them, which is the intended rules behavior.
 - `create`, `update`, `delete`: denied to every client, including a super-admin using the client SDK.
 
-Suspended businesses remain readable by their members so the shell can explain the suspension. Functions reject profile and settings updates while `status != "active"`.
+Suspended businesses remain readable by their members so the shell can explain the suspension. Functions reject profile, settings, and image updates while `status != "active"`. Storage rules reject new logo and cover bytes in that same state. Reading the existing logo or cover stays allowed.
 
 ### 8.4 `businessMembers/{businessId}_{userId}`
 
@@ -799,7 +799,7 @@ The Storage emulator does not model that split. It stores objects in `<project>.
 | `businesses/{businessId}/private/**` | Reserved for later private files | Denied | Denied |
 | any other path | — | Denied | Denied |
 
-Object names are fixed. The client does not choose a filename, which removes path traversal and leftover objects. Replacing a logo overwrites the same path.
+Object names are fixed. The client does not choose a filename, which removes path traversal and leftover objects. Replacing a logo overwrites the same path. A brand write also requires `businesses/{businessId}.status == "active"`. Suspension leaves the object readable and rejects a replacement. `setBusinessImage` uses the same status check and does not link an object for a suspended business.
 
 "Brand" is not public. Unauthenticated reads are denied. Public marketplace images are a Phase 3 change: a specific allow rule for businesses that are active and `publicProfileEnabled`, reviewed in that phase. Phase 1 leaves `publicProfileEnabled` false and has no public rule.
 
@@ -830,7 +830,7 @@ Phase 1 therefore:
 - Displays images by reading bytes through the SDK (`getBlob`) and creating an object URL.
 - Forbids `getDownloadURL` in application code. Step 10 includes a repository search for that call.
 
-The exact Admin SDK call that clears the token is confirmed against the emulator in step 9, because SDK versions differ on whether the key is deleted or set to an empty value. The acceptance test is the behavior: after upload, a non-member SDK read fails, and the download-token metadata is absent.
+The exact Admin SDK call sets `firebaseStorageDownloadTokens` to null and writes `magemaiDownloadTokenStripped: "true"`. On the Storage emulator, null does not replace an existing token, so the previous token remains while the marker is stored. That difference is recorded in [setup.md](./setup.md). A non-member SDK read still fails. Production is expected to drop the key when the value is null.
 
 ## 17. Super-admin authorization and provisioning
 
@@ -1108,7 +1108,7 @@ CI, added in step 10, runs `firebase emulators:exec` so a green test run include
 
 The npm script contract is section 24.11: `dev`, `emulators:start`, `emulators:export`, `emulators:reset`, `emulators:seed`, `test`, `test:rules`, `test:e2e`, `typecheck`, `lint`, and `format`. `npm run test:all` remains the CI entry and runs the same suites inside `firebase emulators:exec --project demo-magemai`. None of these scripts deploy, and none of them accept a project id of `magemai`.
 
-Step 4 wired the scripts in section 24.11. `npm run test:rules` currently checks the emulator hosts. The rule cases in section 20.4, and `npm run test:all`, arrive with steps 9 and 10. This document does not claim those cases pass.
+Step 9 added the rule cases in section 20.4. Step 10 runs them through `npm run test:all` and `.github/workflows/tests.yml`. The latest local counts are in [phase-1-completion-report.md](./phase-1-completion-report.md).
 
 ## 21. Deployment strategy
 
@@ -1534,6 +1534,7 @@ Step 4 adds these `package.json` scripts. Each name is invoked as `npm run <name
 | `test` | `vitest run` | Unit tests. The Vitest config stubs the emulator flag |
 | `test:rules` | `node scripts/emulators.mjs exec -- vitest run --config vitest.rules.config.ts` | `firebase emulators:exec --project demo-magemai` |
 | `test:e2e` | `node scripts/emulators.mjs exec -- playwright test` | Emulator Playwright, including onboarding |
+| `test:all` | `node scripts/emulators.mjs exec -- npm run test:all:suite` | Unit tests, rules tests, and Playwright on `demo-magemai` |
 | `test:e2e:live` | `playwright test --config playwright.live.config.ts` | Live `magemai`. Needs a deploy and ADC. Not run in CI |
 | `test:cleanup:live` | `node scripts/cleanup-live-e2e.mjs` | Deletes only Auth users whose email starts with `e2e+` and their E2E businesses |
 | `seed:platform-settings` | `node scripts/seed-platform-settings.mjs` | `platformSettings/global` on the emulator or on live `magemai` |
@@ -1550,6 +1551,6 @@ Step 4 adds these `package.json` scripts. Each name is invoked as `npm run <name
 firebase emulators:exec --project demo-magemai --only auth,firestore,functions,storage <the command after -->
 ```
 
-`test:rules` and `test:e2e` stay on `demo-magemai`. `test:e2e:live` is the only Playwright command aimed at `magemai`.
+`test:rules`, `test:e2e`, and `test:all` stay on `demo-magemai`. `test:e2e:live` is the only Playwright command aimed at `magemai`.
 
 Windows and the day-to-day commands are in [setup.md](./setup.md).

@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMemo, useState } from "react";
 import { useForm, type FieldPath } from "react-hook-form";
 import { countries } from "@shared/data/countries";
+import { bookingPageUrl, BOOKING_PAGE_ORIGIN } from "@shared/business/booking-url";
 import { suggestSlug } from "@shared/business/slug";
 import { businessInputSchema, type BusinessInput } from "@shared/validation/business";
 import { DISPLAY_NAME_MAX, DISPLAY_NAME_MIN } from "@shared/profile/limits";
@@ -80,6 +81,7 @@ export function OnboardingWizard({
 }) {
   const [step, setStep] = useState(0);
   const [slugEdited, setSlugEdited] = useState(false);
+  const [showSlugError, setShowSlugError] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [displayNameError, setDisplayNameError] = useState("");
   const [logo, setLogo] = useState<File | null>(null);
@@ -117,6 +119,7 @@ export function OnboardingWizard({
     const current = STEPS[step];
     if (!current) return;
     if (step === 0) {
+      setShowSlugError(true);
       const nameProblem = displayNameProblem();
       setDisplayNameError(nameProblem);
       if (nameProblem) return;
@@ -182,21 +185,29 @@ export function OnboardingWizard({
                 label="Business name"
                 error={form.formState.errors.name?.message}
                 {...form.register("name", {
-                  onBlur: () => {
+                  onChange: (event) => {
                     if (slugEdited) return;
-                    const suggestion = suggestSlug(form.getValues("name"));
-                    if (suggestion)
-                      void form.setValue("slug", suggestion, { shouldValidate: true });
+                    const suggestion = suggestSlug(String(event.target.value));
+                    form.setValue("slug", suggestion, {
+                      shouldValidate: false,
+                      shouldDirty: false,
+                      shouldTouch: false,
+                    });
+                    form.clearErrors("slug");
                   },
                 })}
               />
               <Input
-                label="Web address"
-                hint="Lowercase letters, numbers, and hyphens. This becomes the public address."
-                error={form.formState.errors.slug?.message}
+                label="Magemai booking link"
+                hint="Lowercase letters, numbers, and hyphens."
+                error={showSlugError ? form.formState.errors.slug?.message : undefined}
                 {...form.register("slug", {
-                  onChange: () => setSlugEdited(true),
+                  onChange: () => {
+                    setSlugEdited(true);
+                    form.clearErrors("slug");
+                  },
                   onBlur: async () => {
+                    setShowSlugError(true);
                     const valid = await form.trigger("slug");
                     if (!valid) return;
                     const available = await onCheckSlug(form.getValues("slug"));
@@ -206,6 +217,14 @@ export function OnboardingWizard({
                   },
                 })}
               />
+              <p className="text-sm text-muted-foreground">
+                Every business gets one Magemai booking page. This is not your own website.
+              </p>
+              <p className="text-sm text-foreground">
+                {values.slug
+                  ? bookingPageUrl(values.slug)
+                  : `${BOOKING_PAGE_ORIGIN}/business/your-link`}
+              </p>
               <label className="flex flex-col gap-2 text-sm font-medium">
                 Category
                 <select className={selectClass} {...form.register("categoryId")}>
@@ -251,8 +270,8 @@ export function OnboardingWizard({
                 {...form.register("contact.phone")}
               />
               <Input
-                label="Website"
-                hint="Optional. Must start with https://"
+                label="Your own website"
+                hint="Optional. Leave this blank if the business does not have its own website. This is not the Magemai booking link. A link must start with https://."
                 error={form.formState.errors.contact?.website?.message}
                 {...form.register("contact.website")}
               />
@@ -385,9 +404,15 @@ export function OnboardingWizard({
                 <dd>{values.name}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Web address</dt>
-                <dd>{values.slug}</dd>
+                <dt className="text-muted-foreground">Magemai booking link</dt>
+                <dd>{values.slug ? bookingPageUrl(values.slug) : ""}</dd>
               </div>
+              {values.contact.website ? (
+                <div>
+                  <dt className="text-muted-foreground">Your own website</dt>
+                  <dd>{values.contact.website}</dd>
+                </div>
+              ) : null}
               <div>
                 <dt className="text-muted-foreground">Category</dt>
                 <dd>{categoryLabel}</dd>

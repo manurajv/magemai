@@ -89,7 +89,13 @@ export function OnboardingPage() {
       <OnboardingWizard
         settings={settings.data}
         needsDisplayName={missingDisplayName(auth.user?.displayName ?? null)}
-        onCheckSlug={checkSlugAvailability}
+        onCheckSlug={async (slug) => {
+          try {
+            return await checkSlugAvailability(slug);
+          } catch (error) {
+            throw new Error(mapBusinessError(error), { cause: error });
+          }
+        }}
         onSaveDisplayName={saveOwnerDisplayName}
         onCreate={onCreate}
       />

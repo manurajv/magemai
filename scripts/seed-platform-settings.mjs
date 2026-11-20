@@ -12,14 +12,12 @@ if (emulator && projectId === "magemai") {
   process.exit(1);
 }
 
-if (emulator) {
-  process.env.METADATA_SERVER_DETECTION = "none";
-  initializeApp({ projectId });
-} else {
-  initializeApp({ credential: applicationDefault(), projectId: "magemai" });
-}
+if (emulator) process.env.METADATA_SERVER_DETECTION = "none";
+const app = emulator
+  ? initializeApp({ projectId })
+  : initializeApp({ credential: applicationDefault(), projectId: "magemai" });
 
-const db = getFirestore();
+const db = getFirestore(app);
 await db.doc("platformSettings/global").set(
   {
     ...platformDefaults,

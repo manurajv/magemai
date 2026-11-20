@@ -9,11 +9,15 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function platformAdminPath() {
+      return /databases/$(database)/documents/platformAdmins/$(request.auth.uid);
+    }
+
     function isActivePlatformAdmin() {
       return isSignedIn()
         && request.auth.token.superAdmin == true
-        && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid))
-        && get(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)).data.status == 'active';
+        && exists(platformAdminPath())
+        && get(platformAdminPath()).data.status == 'active';
     }
 
     function userUpdateAllowed() {
@@ -30,25 +34,35 @@ service cloud.firestore {
         && request.resource.data.locale == 'en';
     }
 
-    function memberPath(businessId) {
+    function membershipPath(businessId) {
       return /databases/$(database)/documents/businessMembers/$(businessId + '_' + request.auth.uid);
     }
 
+    function membershipExists(businessId) {
+      return isSignedIn() && exists(membershipPath(businessId));
+    }
+
+    function membership(businessId) {
+      return get(membershipPath(businessId));
+    }
+
     function isActiveMember(businessId) {
-      return isSignedIn()
-        && exists(memberPath(businessId))
-        && get(memberPath(businessId)).data.status == 'active'
-        && get(memberPath(businessId)).data.userId == request.auth.uid;
+      return membershipExists(businessId)
+        && membership(businessId).data.status == 'active'
+        && membership(businessId).data.userId == request.auth.uid;
+    }
+
+    function roleIs(businessId, roles) {
+      return isActiveMember(businessId)
+        && membership(businessId).data.role in roles;
     }
 
     function isActiveManager(businessId) {
-      return isActiveMember(businessId)
-        && get(memberPath(businessId)).data.role in ['owner', 'admin', 'manager'];
+      return roleIs(businessId, ['owner', 'admin', 'manager']);
     }
 
     function isActiveOwnerOrAdmin(businessId) {
-      return isActiveMember(businessId)
-        && get(memberPath(businessId)).data.role in ['owner', 'admin'];
+      return roleIs(businessId, ['owner', 'admin']);
     }
 
     // Profile creation is the syncAuthProfile callable. Clients may update
@@ -73,9 +87,8 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
-    // A manager list filtered by businessId is intentionally omitted.
-    // That query depends on resource data inside get(), which the rules
-    // language rejects. Step 6 does not need a staff directory.
+    // List allows three shapes: the caller's own userId, an active platform
+    // admin, or a manager query that pins businessId. exists() runs before get().
     match /businessMembers/{memberId} {
       allow get: if isSignedIn() && (
         resource.data.userId == request.auth.uid
@@ -85,6 +98,10 @@ service cloud.firestore {
       allow list: if isSignedIn() && (
         resource.data.userId == request.auth.uid
         || isActivePlatformAdmin()
+        || (
+          resource.data.businessId is string
+          && isActiveManager(resource.data.businessId)
+        )
       );
       allow create, update, delete: if false;
     }

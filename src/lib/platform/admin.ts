@@ -14,7 +14,7 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import type { BusinessLifecycle, VerificationStatus } from "@shared/validation/platform";
-import { firebaseErrorCode } from "@/lib/auth/errors";
+import { firebaseErrorCode, unexpectedCallableMessage } from "@/lib/auth/errors";
 import { getFirebase } from "@/lib/firebase/client";
 
 export const PLATFORM_PAGE_SIZE = 25;
@@ -265,6 +265,8 @@ export async function loadPlatformSettingsView(): Promise<PlatformSettingsView> 
 }
 
 export function mapPlatformError(error: unknown): string {
+  const unexpected = unexpectedCallableMessage(error);
+  if (unexpected) return unexpected;
   const code = firebaseErrorCode(error);
   if (code.includes("permission-denied")) return "You do not have platform access.";
   if (code.includes("unauthenticated")) return "Sign in before continuing.";

@@ -7,9 +7,9 @@ if (process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HO
   process.exit(1);
 }
 
-initializeApp({ credential: applicationDefault(), projectId: "magemai" });
-const auth = getAuth();
-const db = getFirestore();
+const app = initializeApp({ credential: applicationDefault(), projectId: "magemai" });
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 let pageToken;
 let removed = 0;

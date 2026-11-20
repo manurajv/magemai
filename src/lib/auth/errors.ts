@@ -14,6 +14,22 @@ export function firebaseErrorCode(error: unknown): string {
   return "";
 }
 
+export const UNEXPECTED_CALLABLE_MESSAGE =
+  "Something went wrong on our side. Try again in a moment.";
+
+export function unexpectedCallableMessage(error: unknown): string | null {
+  const code = firebaseErrorCode(error);
+  const message = error instanceof Error ? error.message.trim() : "";
+  if (
+    code === "functions/internal" ||
+    code === "functions/unknown" ||
+    /^internal(?:\s*\[500\])?$/i.test(message)
+  ) {
+    return UNEXPECTED_CALLABLE_MESSAGE;
+  }
+  return null;
+}
+
 export function mapAuthError(error: unknown): string {
   const code = firebaseErrorCode(error);
   const message = error instanceof Error ? error.message : "";
@@ -52,6 +68,8 @@ export function mapAuthError(error: unknown): string {
 }
 
 export function mapProfileError(error: unknown): string {
+  const unexpected = unexpectedCallableMessage(error);
+  if (unexpected) return unexpected;
   const code = firebaseErrorCode(error);
   if (code === "permission-denied" || code === "storage/unauthorized") {
     return "You cannot change that profile.";

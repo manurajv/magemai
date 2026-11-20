@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { superAdminNavigation } from "@/app/navigation/items";
 import { AppShell } from "@/app/layouts/app-shell";
@@ -7,10 +7,24 @@ import { useAuth } from "@/app/providers/auth-context";
 import { ErrorState } from "@/components/shared/error-state";
 import { LoadingState } from "@/components/shared/loading-state";
 import { PageHeader } from "@/components/shared/page-header";
+import { Button } from "@/components/ui/button";
 import { platformAccessDecision, type RegistryState } from "@/lib/platform/access";
 import { readOwnPlatformAdmin } from "@/lib/platform/admin";
 
-function Denied({ title, description }: { title: string; description: string }) {
+const recheckHint =
+  "If platform access was just granted, check again. You can also sign out and sign back in.";
+
+function Denied({
+  title,
+  description,
+  hint,
+  onRecheck,
+}: {
+  title: string;
+  description: string;
+  hint: string;
+  onRecheck: () => void;
+}) {
   return (
     <div
       className="mx-auto flex min-h-dvh max-w-lg items-center px-4"
@@ -19,6 +33,10 @@ function Denied({ title, description }: { title: string; description: string }) 
       <div className="flex flex-col gap-3">
         <PageHeader title={title} description={description} />
         <p role="alert">403</p>
+        <p className="text-sm text-muted-foreground">{hint}</p>
+        <Button type="button" variant="outline" onClick={onRecheck}>
+          Check again
+        </Button>
       </div>
     </div>
   );
@@ -26,13 +44,19 @@ function Denied({ title, description }: { title: string; description: string }) 
 
 function Gate({ children }: { children: ReactNode }) {
   const auth = useAuth();
+  const queryClient = useQueryClient();
   const uid = auth.user?.uid ?? null;
-  const claim = useSuperAdminClaim(uid);
+  const platformClaim = useSuperAdminClaim(uid);
+  const claim = platformClaim.claim;
   const registry = useQuery({
     queryKey: ["platform-admin", uid],
     enabled: claim === "yes" && uid !== null,
     queryFn: () => readOwnPlatformAdmin(uid ?? ""),
   });
+  function recheck() {
+    platformClaim.recheck();
+    void queryClient.invalidateQueries({ queryKey: ["platform-admin", uid] });
+  }
   const registryState: RegistryState = !registry.isFetched
     ? "loading"
     : registry.isError
@@ -65,18 +89,24 @@ function Gate({ children }: { children: ReactNode }) {
       <Denied
         title="Platform access denied"
         description="You do not have platform access. The business dashboard is a separate area."
+        hint={recheckHint}
+        onRecheck={recheck}
       />
     );
   }
   if (access === "denied-registry") {
     return (
       <AppShell items={superAdminNavigation} heading="Platform">
-        <div data-testid="platform-denied">
+        <div className="flex max-w-lg flex-col gap-3" data-testid="platform-denied">
           <PageHeader
             title="Platform access denied"
             description="This platform access is no longer active. A previous sign-in token does not restore it."
           />
           <p role="alert">403</p>
+          <p className="text-sm text-muted-foreground">{recheckHint}</p>
+          <Button type="button" variant="outline" onClick={recheck}>
+            Check again
+          </Button>
         </div>
       </AppShell>
     );

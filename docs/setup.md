@@ -218,7 +218,9 @@ npm run lint
 npm run format
 ```
 
-`npm test` does not need the emulators. `test:rules` and `test:e2e` start the Emulator Suite as `demo-magemai` and refuse a non-local host. They do not deploy.
+`npm test` does not need the emulators. `test:rules` and `test:e2e` start the Emulator Suite as `demo-magemai` and refuse a non-local host. They do not deploy. `npm run test:all` starts that same suite once and runs unit tests, rules tests, and Playwright. It does not receive service-account credentials.
+
+`clearDownloadToken` in `functions/src/storage.ts` sets `firebaseStorageDownloadTokens` to null. On the Storage emulator that null does not replace a token that is already stored. The marker `magemaiDownloadTokenStripped` is stored as `"true"`, and the previous token value remains. A signed-out Storage SDK read of the object still fails. This was confirmed against the emulator in the rules suite. Do not treat a remaining emulator token as a live download URL.
 
 `npm run test:e2e:live` talks to project `magemai`. It fails until section 11 has been deployed. `npm run test:cleanup:live` deletes only users whose email starts with `e2e+`.
 

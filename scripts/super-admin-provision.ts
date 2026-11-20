@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { applicationDefault, getApps, initializeApp } from "firebase-admin/app";
+import { applicationDefault, getApp, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth, type UserRecord } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import path from "node:path";
@@ -303,8 +303,9 @@ function millis(value: unknown): number | null {
 }
 
 export function createAdminStore(): SuperAdminStore {
-  const auth = getAuth();
-  const db = getFirestore();
+  const app = getApp();
+  const auth = getAuth(app);
+  const db = getFirestore(app);
   return {
     now: () => Date.now(),
     async findUser(email) {
@@ -426,12 +427,12 @@ export function createAdminStore(): SuperAdminStore {
   };
 }
 
-export function ensureAdminApp(projectId: string, emulator: boolean): void {
-  if (getApps().length > 0) return;
+export function ensureAdminApp(projectId: string, emulator: boolean): App {
+  const existing = getApps()[0];
+  if (existing) return existing;
   if (emulator) {
     process.env.METADATA_SERVER_DETECTION = "none";
-    initializeApp({ projectId });
-    return;
+    return initializeApp({ projectId });
   }
-  initializeApp({ credential: applicationDefault(), projectId });
+  return initializeApp({ credential: applicationDefault(), projectId });
 }

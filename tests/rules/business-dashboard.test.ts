@@ -171,12 +171,30 @@ describe("business dashboard callables", () => {
         "updateBusinessProfile",
       )({ businessId: staff.businessId, ...profile("Nope") }),
     ).rejects.toThrow(/cannot change/i);
+    await expect(
+      httpsCallable(
+        getFunctions(app, "asia-south1"),
+        "updateBusinessSettings",
+      )({
+        businessId: staff.businessId,
+        timezone: "Asia/Colombo",
+        currency: "USD",
+        language: "en",
+        notificationEmail: "",
+      }),
+    ).rejects.toThrow(/cannot change/i);
     const suspended = await signIn(`suspended-${Date.now()}@example.test`, "owner", "suspended");
     await expect(
       httpsCallable(
         getFunctions(app, "asia-south1"),
         "updateBusinessProfile",
       )({ businessId: suspended.businessId, ...profile("Nope") }),
+    ).rejects.toThrow(/suspended/i);
+    await expect(
+      httpsCallable(
+        getFunctions(app, "asia-south1"),
+        "setBusinessImage",
+      )({ businessId: suspended.businessId, kind: "logo" }),
     ).rejects.toThrow(/suspended/i);
   });
 

@@ -12,10 +12,9 @@ function liveAdmin() {
   if (process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST) {
     throw new Error("Unset the emulator hosts before npm run test:e2e:live.");
   }
-  if (getApps().length === 0) {
-    initializeApp({ credential: applicationDefault(), projectId: "magemai" });
-  }
-  return { auth: getAuth(), db: getFirestore() };
+  const app =
+    getApps()[0] ?? initializeApp({ credential: applicationDefault(), projectId: "magemai" });
+  return { auth: getAuth(app), db: getFirestore(app) };
 }
 
 async function fillBusiness(page: Page, name: string, slug: string) {
@@ -26,10 +25,12 @@ async function fillBusiness(page: Page, name: string, slug: string) {
   const businessName = page.getByLabel("Business name");
   await businessName.fill(name);
   await businessName.blur();
-  const address = page.getByLabel("Web address");
+  const address = page.getByLabel("Magemai booking link");
   await expect(address).not.toHaveValue("");
+  await expect(page.getByText("This is not your own website.")).toBeVisible();
   await address.fill(slug);
   await expect(address).toHaveValue(slug);
+  await expect(page.getByText(`https://magemai.web.app/business/${slug}`)).toBeVisible();
   await address.blur();
   await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: "Next" }).click();
