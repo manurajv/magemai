@@ -93,6 +93,40 @@ export const businessInputSchema = z.object({
 
 export type BusinessInput = z.infer<typeof businessInputSchema>;
 
+export const businessProfileSchema = businessInputSchema.omit({
+  slug: true,
+  timezone: true,
+  currency: true,
+  language: true,
+});
+
+export type BusinessProfileInput = z.infer<typeof businessProfileSchema>;
+
+const optionalEmail = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === "" || z.email().safeParse(value).success,
+    "Enter a valid email address.",
+  );
+
+export const businessSettingsSchema = z.object({
+  timezone: businessInputSchema.shape.timezone,
+  currency: businessInputSchema.shape.currency,
+  language: businessInputSchema.shape.language,
+  notificationEmail: optionalEmail,
+});
+
+export type BusinessSettingsInput = z.infer<typeof businessSettingsSchema>;
+
+export const businessProfileUpdateSchema = businessProfileSchema.extend({
+  businessId: z.string().trim().min(1, "Choose a business."),
+});
+
+export const businessSettingsUpdateSchema = businessSettingsSchema.extend({
+  businessId: z.string().trim().min(1, "Choose a business."),
+});
+
 export type PlatformSettingsSnapshot = {
   supportedCurrencies: readonly string[];
   supportedLanguages: readonly string[];

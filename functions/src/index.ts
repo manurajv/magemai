@@ -3,7 +3,13 @@ import "./options.js";
 import { beforeUserSignedIn } from "firebase-functions/v2/identity";
 import { rejectCrossProvider } from "./provider-guard.js";
 
-export { checkSlugAvailability, createBusiness, setBusinessImage } from "./business.js";
+export {
+  checkSlugAvailability,
+  createBusiness,
+  setBusinessImage,
+  updateBusinessProfile,
+  updateBusinessSettings,
+} from "./business.js";
 export { setUserAvatar, stripDownloadTokens, syncAuthProfile } from "./users.js";
 
 /**

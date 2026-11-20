@@ -46,6 +46,11 @@ service cloud.firestore {
         && get(memberPath(businessId)).data.role in ['owner', 'admin', 'manager'];
     }
 
+    function isActiveOwnerOrAdmin(businessId) {
+      return isActiveMember(businessId)
+        && get(memberPath(businessId)).data.role in ['owner', 'admin'];
+    }
+
     // Profile creation is the syncAuthProfile callable. Clients may update
     // only the allow-list. Business records, slugs, and audit logs stay deny-all.
     match /users/{uid} {
@@ -81,6 +86,16 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid
         || isActivePlatformAdmin()
       );
+      allow create, update, delete: if false;
+    }
+
+    match /auditLogs/{logId} {
+      allow get, list: if isActivePlatformAdmin()
+        || (
+          resource.data.scope == 'business'
+          && resource.data.businessId is string
+          && isActiveOwnerOrAdmin(resource.data.businessId)
+        );
       allow create, update, delete: if false;
     }
 

@@ -4,6 +4,8 @@ import {
   LIVE_PROJECT_ID,
   assertProductionBuildHasNoEmulators,
   firebaseWebConfig,
+  missingProductionFirebaseKeys,
+  productionFirebaseConfigError,
   resolveFirebaseAccess,
   type FirebaseClientEnv,
 } from "@/lib/firebase/env";
@@ -88,6 +90,38 @@ describe("assertProductionBuildHasNoEmulators", () => {
     expect(() => assertProductionBuildHasNoEmulators("production", "false")).not.toThrow();
     expect(() => assertProductionBuildHasNoEmulators("production", undefined)).not.toThrow();
     expect(() => assertProductionBuildHasNoEmulators("development", "true")).not.toThrow();
+  });
+});
+
+describe("production firebase config guard", () => {
+  const complete = {
+    VITE_FIREBASE_API_KEY: "public-key",
+    VITE_FIREBASE_AUTH_DOMAIN: "magemai.firebaseapp.com",
+    VITE_FIREBASE_PROJECT_ID: "magemai",
+    VITE_FIREBASE_STORAGE_BUCKET: "magemai.firebasestorage.app",
+    VITE_FIREBASE_MESSAGING_SENDER_ID: "122706427013",
+    VITE_FIREBASE_APP_ID: "1:122706427013:web:abc",
+  };
+
+  it("fails a production build when a required value is missing", () => {
+    const missing = missingProductionFirebaseKeys("production", {
+      ...complete,
+      VITE_FIREBASE_API_KEY: "",
+    });
+    expect(missing).toEqual(["VITE_FIREBASE_API_KEY"]);
+    expect(productionFirebaseConfigError(missing, true)).toMatch(/UTF-8 BOM/);
+    expect(productionFirebaseConfigError(missing, true)).toMatch(/Firebase is unavailable/);
+  });
+
+  it("allows a complete production config and skips emulator builds", () => {
+    expect(missingProductionFirebaseKeys("production", complete)).toEqual([]);
+    expect(productionFirebaseConfigError([], false)).toBeNull();
+    expect(
+      missingProductionFirebaseKeys("production", {
+        VITE_USE_FIREBASE_EMULATORS: "true",
+      }),
+    ).toEqual([]);
+    expect(missingProductionFirebaseKeys("development", {})).toEqual([]);
   });
 });
 

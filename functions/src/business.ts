@@ -10,10 +10,15 @@ import {
 } from "../../shared/business/limits.js";
 import { isReservedSlug } from "../../shared/business/slug.js";
 import { isAvatarContentType } from "../../shared/profile/limits.js";
+import { roleHas } from "../../shared/permissions/index.js";
 import {
   businessInputSchema,
+  businessProfileUpdateSchema,
   businessSettingsError,
+  businessSettingsUpdateSchema,
   emptyToNull,
+  type BusinessProfileInput,
+  type BusinessSettingsInput,
   type PlatformSettingsSnapshot,
 } from "../../shared/validation/business.js";
 import "./admin.js";
@@ -27,12 +32,13 @@ const BRAND_KINDS = {
 
 function requireVerifiedUser(
   requestAuth: { uid: string; token: { email_verified?: boolean } } | undefined,
+  purpose = "creating a business",
 ) {
   if (!requestAuth) {
     throw new HttpsError("unauthenticated", "Sign in before continuing.");
   }
   if (requestAuth.token.email_verified !== true) {
-    throw new HttpsError("permission-denied", "Verify your email before creating a business.");
+    throw new HttpsError("permission-denied", `Verify your email before ${purpose}.`);
   }
   return requestAuth.uid;
 }
@@ -303,4 +309,188 @@ export const setBusinessImage = onCall(async (request) => {
   });
   await batch.commit();
   return { path: objectPath };
+});
+
+function assertMemberEdit(
+  member: { exists: boolean; get: (field: string) => unknown },
+  business: { exists: boolean; get: (field: string) => unknown },
+  permission: "business.profile.update" | "business.settings.update",
+): void {
+  if (
+    !member.exists ||
+    member.get("status") !== "active" ||
+    !roleHas(member.get("role"), permission)
+  ) {
+    throw new HttpsError("permission-denied", "You cannot change this business.");
+  }
+  if (!business.exists) {
+    throw new HttpsError("not-found", "This business was not found.");
+  }
+  if (business.get("status") !== "active") {
+    throw new HttpsError(
+      "failed-precondition",
+      "This business is suspended. Editing is turned off.",
+    );
+  }
+}
+
+function sameText(stored: unknown, next: string | null): boolean {
+  return (stored ?? null) === next;
+}
+
+function profileUnchanged(
+  business: { get: (field: string) => unknown },
+  input: BusinessProfileInput,
+): boolean {
+  const contact = (business.get("contact") ?? {}) as Record<string, unknown>;
+  const address = (business.get("address") ?? {}) as Record<string, unknown>;
+  return (
+    business.get("name") === input.name &&
+    business.get("categoryId") === input.categoryId &&
+    business.get("description") === input.description &&
+    contact.email === input.contact.email &&
+    sameText(contact.phone, emptyToNull(input.contact.phone)) &&
+    sameText(contact.website, emptyToNull(input.contact.website)) &&
+    address.line1 === input.address.line1 &&
+    sameText(address.line2, emptyToNull(input.address.line2)) &&
+    address.city === input.address.city &&
+    sameText(address.region, emptyToNull(input.address.region)) &&
+    sameText(address.postalCode, emptyToNull(input.address.postalCode)) &&
+    address.country === input.address.country
+  );
+}
+
+export const updateBusinessProfile = onCall(async (request) => {
+  const uid = requireVerifiedUser(request.auth, "editing a business");
+  await assertAccountActive(uid);
+  const parsed = businessProfileUpdateSchema.safeParse(request.data);
+  if (!parsed.success) {
+    throw new HttpsError("invalid-argument", parsed.error.issues[0]?.message ?? "Check the form.");
+  }
+  const { businessId, ...input } = parsed.data;
+  const settings = await loadSettings();
+  if (!settings.businessCategories.some((category) => category.id === input.categoryId)) {
+    throw new HttpsError("invalid-argument", "Choose a category from the list.");
+  }
+  const db = getFirestore();
+  const businessRef = db.doc(`businesses/${businessId}`);
+  const memberRef = db.doc(`businessMembers/${businessId}_${uid}`);
+  const auditRef = db.collection("auditLogs").doc();
+  const now = FieldValue.serverTimestamp();
+  let changed = false;
+  await db.runTransaction(async (transaction) => {
+    const member = await transaction.get(memberRef);
+    const business = await transaction.get(businessRef);
+    assertMemberEdit(member, business, "business.profile.update");
+    if (profileUnchanged(business, input)) return;
+    changed = true;
+    transaction.update(businessRef, {
+      name: input.name,
+      categoryId: input.categoryId,
+      description: input.description,
+      contact: {
+        email: input.contact.email,
+        phone: emptyToNull(input.contact.phone),
+        website: emptyToNull(input.contact.website),
+      },
+      address: {
+        line1: input.address.line1,
+        line2: emptyToNull(input.address.line2),
+        city: input.address.city,
+        region: emptyToNull(input.address.region),
+        postalCode: emptyToNull(input.address.postalCode),
+        country: input.address.country,
+      },
+      updatedBy: uid,
+      updatedAt: now,
+    });
+    transaction.set(auditRef, {
+      id: auditRef.id,
+      scope: "business",
+      businessId,
+      actorId: uid,
+      actorType: "user",
+      action: "business.profile.update",
+      targetType: "business",
+      targetId: businessId,
+      summary: "Updated the business profile.",
+      metadata: { fields: ["name", "categoryId", "description", "contact", "address"] },
+      createdAt: now,
+    });
+  });
+  return { ok: true, changed };
+});
+
+function settingsUnchanged(
+  business: { get: (field: string) => unknown },
+  input: BusinessSettingsInput,
+): boolean {
+  const settings = (business.get("settings") ?? {}) as Record<string, unknown>;
+  return (
+    business.get("timezone") === input.timezone &&
+    business.get("currency") === input.currency &&
+    business.get("language") === input.language &&
+    sameText(settings.notificationEmail, emptyToNull(input.notificationEmail))
+  );
+}
+
+export const updateBusinessSettings = onCall(async (request) => {
+  const uid = requireVerifiedUser(request.auth, "editing business settings");
+  await assertAccountActive(uid);
+  const parsed = businessSettingsUpdateSchema.safeParse(request.data);
+  if (!parsed.success) {
+    throw new HttpsError("invalid-argument", parsed.error.issues[0]?.message ?? "Check the form.");
+  }
+  const { businessId, ...input } = parsed.data;
+  const platform = await loadSettings();
+  if (!platform.supportedCurrencies.includes(input.currency)) {
+    throw new HttpsError("invalid-argument", "Choose a supported currency.");
+  }
+  if (!platform.supportedLanguages.includes(input.language)) {
+    throw new HttpsError("invalid-argument", "Choose a supported language.");
+  }
+  const db = getFirestore();
+  const businessRef = db.doc(`businesses/${businessId}`);
+  const memberRef = db.doc(`businessMembers/${businessId}_${uid}`);
+  const auditRef = db.collection("auditLogs").doc();
+  const now = FieldValue.serverTimestamp();
+  let changed = false;
+  await db.runTransaction(async (transaction) => {
+    const member = await transaction.get(memberRef);
+    const business = await transaction.get(businessRef);
+    assertMemberEdit(member, business, "business.settings.update");
+    if (settingsUnchanged(business, input)) return;
+    changed = true;
+    const current = (business.get("settings") ?? {}) as Record<string, unknown>;
+    transaction.update(businessRef, {
+      timezone: input.timezone,
+      currency: input.currency,
+      language: input.language,
+      settings: {
+        bookingApprovalMode: current.bookingApprovalMode ?? "manual",
+        notificationEmail: emptyToNull(input.notificationEmail),
+        publicProfileEnabled: current.publicProfileEnabled === true,
+      },
+      updatedBy: uid,
+      updatedAt: now,
+    });
+    transaction.set(auditRef, {
+      id: auditRef.id,
+      scope: "business",
+      businessId,
+      actorId: uid,
+      actorType: "user",
+      action: "business.settings.update",
+      targetType: "business",
+      targetId: businessId,
+      summary: "Updated business settings.",
+      metadata: {
+        timezone: input.timezone,
+        currency: input.currency,
+        language: input.language,
+      },
+      createdAt: now,
+    });
+  });
+  return { ok: true, changed };
 });

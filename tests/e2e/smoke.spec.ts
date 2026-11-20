@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { ensureVerifiedUser } from "./emulator-user";
+import { ensureVerifiedUser, seedMembership } from "./emulator-user";
 
 test("home names Magemai and the emulator project", async ({ page }) => {
   await page.goto("/");
@@ -24,7 +24,14 @@ test("sign-in and registration forms are available", async ({ page }) => {
 
 test("admin shell marks future sections coming soon", async ({ page }, testInfo) => {
   const email = `shell.${testInfo.project.name}@example.test`;
-  await ensureVerifiedUser(email, "emupass-not-for-live", "Shell User");
+  const uid = await ensureVerifiedUser(email, "emupass-not-for-live", "Shell User");
+  await seedMembership({
+    uid,
+    email,
+    businessId: `shell-${testInfo.project.name}`,
+    name: `Shell ${testInfo.project.name}`,
+    slug: `shell-${testInfo.project.name}`,
+  });
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("emupass-not-for-live");
@@ -43,7 +50,10 @@ test("admin shell marks future sections coming soon", async ({ page }, testInfo)
   await expect(sidebar.getByRole("button", { name: /Services/ })).toBeDisabled();
   await expect(sidebar.getByRole("link", { name: "Services" })).toHaveCount(0);
   await expect(sidebar.getByRole("button", { name: /Reports/ })).toBeDisabled();
-  await expect(page.getByText(/not yet implemented/i).first()).toBeVisible();
+  await expect(page.getByTestId("active-business-name")).toHaveText(
+    `Shell ${testInfo.project.name}`,
+  );
+  await expect(page.getByText("No activity yet")).toBeVisible();
   if (testInfo.project.name === "desktop" || testInfo.project.name === "mobile") {
     await page.screenshot({
       path: testInfo.outputPath(`app-shell-${testInfo.project.name}.png`),

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import type { BusinessInput } from "@shared/validation/business";
@@ -6,6 +6,8 @@ import { useAuth } from "@/app/providers/auth-context";
 import { OnboardingWizard } from "@/app/pages/onboarding-wizard";
 import { ErrorState } from "@/components/shared/error-state";
 import { LoadingState } from "@/components/shared/loading-state";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { firebaseErrorCode } from "@/lib/auth/errors";
 import {
@@ -27,6 +29,7 @@ export function OnboardingPage() {
   useDocumentTitle("Create a business");
   const auth = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [createdId, setCreatedId] = useState<string | null>(null);
   const settings = useQuery({
     queryKey: ["platform-settings", "global"],
@@ -43,6 +46,9 @@ export function OnboardingPage() {
       if (images.logo) await saveBusinessImage(businessId, "logo", images.logo);
       if (images.cover) await saveBusinessImage(businessId, "cover", images.cover);
       rememberActiveBusiness(businessId);
+      if (auth.user) {
+        await queryClient.invalidateQueries({ queryKey: ["memberships", auth.user.uid] });
+      }
       await navigate("/admin");
     } catch (error) {
       if (firebaseErrorCode(error)) {
@@ -65,7 +71,21 @@ export function OnboardingPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8">
+      <div className="flex justify-end">
+        <DropdownMenu
+          label="Account"
+          trigger={
+            <Button type="button" variant="outline" size="sm">
+              Account
+            </Button>
+          }
+          items={[
+            { label: "Profile", onSelect: () => void navigate("/profile") },
+            { label: "Sign out", onSelect: () => void auth.signOut() },
+          ]}
+        />
+      </div>
       <OnboardingWizard
         settings={settings.data}
         needsDisplayName={missingDisplayName(auth.user?.displayName ?? null)}

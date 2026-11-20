@@ -30,6 +30,91 @@ export async function seedPlatformSettings() {
     .set({ ...platformDefaults, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
 }
 
+export async function seedMembership(input: {
+  uid: string;
+  email: string;
+  businessId: string;
+  name: string;
+  slug: string;
+  role?: "owner" | "admin" | "manager" | "staff";
+  status?: "active" | "suspended";
+  createdAtMs?: number;
+}) {
+  const projectId =
+    process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? "demo-magemai";
+  if (projectId === "magemai") throw new Error("Refusing to seed a live business.");
+  if (getApps().length === 0) initializeApp({ projectId });
+  const db = getFirestore();
+  const role = input.role ?? "owner";
+  const createdAt = new Date(input.createdAtMs ?? Date.now());
+  await db.doc(`users/${input.uid}`).set(
+    {
+      id: input.uid,
+      email: input.email,
+      emailVerified: true,
+      displayName: "Member",
+      phoneNumber: null,
+      photoPath: null,
+      locale: "en",
+      status: "active",
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      lastLoginAt: null,
+    },
+    { merge: true },
+  );
+  await db.doc(`businesses/${input.businessId}`).set({
+    id: input.businessId,
+    name: input.name,
+    slug: input.slug,
+    categoryId: "photography",
+    description: "Portraits",
+    contact: { email: "studio@example.test", phone: null, website: null },
+    address: {
+      line1: "1 Galle Road",
+      line2: null,
+      city: "Colombo",
+      region: null,
+      postalCode: null,
+      country: "LK",
+    },
+    timezone: "Asia/Colombo",
+    currency: "LKR",
+    language: "en",
+    status: input.status ?? "active",
+    verificationStatus: "unverified",
+    ownerId: input.uid,
+    settings: {
+      bookingApprovalMode: "manual",
+      notificationEmail: null,
+      publicProfileEnabled: false,
+    },
+    logoPath: null,
+    coverImagePath: null,
+    createdBy: input.uid,
+    updatedBy: input.uid,
+    createdAt,
+    updatedAt: createdAt,
+  });
+  await db.doc(`businessMembers/${input.businessId}_${input.uid}`).set({
+    id: `${input.businessId}_${input.uid}`,
+    businessId: input.businessId,
+    userId: input.uid,
+    role,
+    status: "active",
+    createdBy: input.uid,
+    revokedAt: null,
+    revokedBy: null,
+    createdAt,
+    updatedAt: createdAt,
+  });
+  await db.doc(`businessSlugs/${input.slug}`).set({
+    slug: input.slug,
+    businessId: input.businessId,
+    createdAt,
+  });
+}
+
 export async function ensureVerifiedUser(email: string, password: string, displayName: string) {
   const auth = adminAuth();
   try {
