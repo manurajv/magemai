@@ -77,6 +77,43 @@ export function assertProductionBuildHasNoEmulators(
   }
 }
 
+export const REQUIRED_LIVE_FIREBASE_KEYS = [
+  "VITE_FIREBASE_API_KEY",
+  "VITE_FIREBASE_AUTH_DOMAIN",
+  "VITE_FIREBASE_PROJECT_ID",
+  "VITE_FIREBASE_STORAGE_BUCKET",
+  "VITE_FIREBASE_MESSAGING_SENDER_ID",
+  "VITE_FIREBASE_APP_ID",
+] as const;
+
+/**
+ * A production build that is not the emulator must have every public web
+ * config value. An empty value, including one hidden by a UTF-8 BOM on the
+ * first line of `.env.local`, would otherwise ship a bundle that shows
+ * "Firebase is unavailable".
+ */
+export function missingProductionFirebaseKeys(
+  mode: string | undefined,
+  env: Record<string, string | undefined>,
+): string[] {
+  if (mode !== "production") return [];
+  if ((env.VITE_USE_FIREBASE_EMULATORS ?? "").trim() === "true") return [];
+  return REQUIRED_LIVE_FIREBASE_KEYS.filter(
+    (key) => !(env[key] ?? "").replace(/^\uFEFF/, "").trim(),
+  );
+}
+
+export function productionFirebaseConfigError(
+  missing: readonly string[],
+  bom: boolean,
+): string | null {
+  if (missing.length === 0) return null;
+  const bomNote = bom
+    ? ' A UTF-8 BOM is at the start of an env file. Vite then ignores the first name, usually VITE_FIREBASE_API_KEY, and the deployed app shows "Firebase is unavailable". Save .env.local and .env.production as UTF-8 without a BOM.'
+    : ' If .env.local was saved with a UTF-8 BOM, Vite drops the first name, usually VITE_FIREBASE_API_KEY, and the deployed app shows "Firebase is unavailable". Save the file as UTF-8 without a BOM.';
+  return `Production build is missing ${missing.join(", ")}. Refusing to build a bundle that cannot start Firebase.${bomNote}`;
+}
+
 const LIVE_WEB_KEYS = [
   ["apiKey", "VITE_FIREBASE_API_KEY"],
   ["authDomain", "VITE_FIREBASE_AUTH_DOMAIN"],

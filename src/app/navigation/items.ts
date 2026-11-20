@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Briefcase,
+  Building2,
   Calendar,
   CalendarCheck,
   FileText,
@@ -8,12 +9,14 @@ import {
   LayoutDashboard,
   MessagesSquare,
   Package,
+  Settings,
   Shield,
   UserRound,
   Users,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import { roleHas, type BusinessRole } from "@shared/permissions";
 
 export type NavItem =
   | { label: string; icon: LucideIcon; to: string }
@@ -21,6 +24,8 @@ export type NavItem =
 
 export const businessNavigation = [
   { label: "Overview", icon: LayoutDashboard, to: "/admin" },
+  { label: "Business profile", icon: Building2, to: "/admin/profile" },
+  { label: "Settings", icon: Settings, to: "/admin/settings" },
   { label: "Services", icon: Briefcase, comingSoon: true },
   { label: "Packages", icon: Package, comingSoon: true },
   { label: "Bookings", icon: CalendarCheck, comingSoon: true },
@@ -33,6 +38,15 @@ export const businessNavigation = [
   { label: "Projects", icon: FolderKanban, comingSoon: true },
   { label: "Reports", icon: BarChart3, comingSoon: true },
 ] as const satisfies readonly NavItem[];
+
+export function visibleBusinessNavigation(role: BusinessRole): readonly NavItem[] {
+  return businessNavigation.filter((item) => {
+    if (!("to" in item)) return true;
+    if (item.to === "/admin/profile") return roleHas(role, "business.profile.read");
+    if (item.to === "/admin/settings") return roleHas(role, "business.settings.read");
+    return true;
+  });
+}
 
 export const superAdminNavigation = [
   { label: "Overview", icon: Shield, to: "/super-admin" },

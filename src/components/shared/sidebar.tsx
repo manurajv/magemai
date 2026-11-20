@@ -55,7 +55,7 @@ export function Sidebar({ open, onClose, items, heading }: SidebarProps) {
             Close
           </button>
         </div>
-        <p className="px-4 pb-2 text-xs font-medium tracking-wide text-primary-foreground/60 uppercase">
+        <p className="truncate px-4 pb-2 text-xs font-medium tracking-wide text-primary-foreground/60">
           {heading}
         </p>
         <div className="flex-1 overflow-y-auto px-3 pb-4">

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { latestOob } from "./emulator-user";
+import { latestOob, seedPlatformSettings } from "./emulator-user";
 
 const password = "emupass-not-for-live";
 const resetPassword = "emupass-reset-ok";
@@ -14,6 +14,7 @@ test("register, verify, profile, logout, and password reset", async ({
   request,
 }, testInfo) => {
   test.setTimeout(90_000);
+  await seedPlatformSettings();
   const project = testInfo.project.name;
   const email = `e2e.${project}@example.test`;
 
@@ -54,13 +55,13 @@ test("register, verify, profile, logout, and password reset", async ({
   await page.getByRole("button", { name: "Confirm email" }).click();
   await expect(page.getByRole("status")).toContainText("Email verified");
   await page.goto("/verify-email");
-  const dashboard = page.getByRole("heading", { name: "Dashboard" });
+  const onboarding = page.getByRole("heading", { name: "Create a business" });
   const refresh = page.getByRole("button", { name: "I've verified" });
-  await expect(dashboard.or(refresh)).toBeVisible();
+  await expect(onboarding.or(refresh)).toBeVisible();
   if (await refresh.isVisible()) {
     await refresh.click({ timeout: 5_000 }).catch(() => undefined);
   }
-  await expect(dashboard).toBeVisible();
+  await expect(onboarding).toBeVisible();
 
   await page.goto("/profile");
   await expect(page.getByRole("heading", { name: "Your profile" })).toBeVisible();
@@ -92,7 +93,7 @@ test("register, verify, profile, logout, and password reset", async ({
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create a business" })).toBeVisible();
   await page.getByRole("button", { name: "Account" }).click();
   await page.getByRole("menuitem", { name: "Sign out" }).click();
 
@@ -111,7 +112,7 @@ test("register, verify, profile, logout, and password reset", async ({
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(resetPassword);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create a business" })).toBeVisible();
 });
 
 test("google redirect is offered when the flag is on", async ({ page }) => {

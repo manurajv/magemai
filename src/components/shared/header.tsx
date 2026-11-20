@@ -1,6 +1,7 @@
 import { Menu } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/app/providers/auth-context";
+import { BusinessSwitcher } from "@/components/business/business-switcher";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu } from "@/components/ui/dropdown-menu";
@@ -35,16 +36,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
       <div className="lg:hidden">
         <Logo compact />
       </div>
-      <button
-        type="button"
-        disabled
-        className="flex min-w-0 flex-1 flex-col items-start rounded-md border border-border bg-background px-3 py-1.5 text-left sm:flex-none"
-      >
-        <span className="max-w-full truncate text-sm font-medium">No business selected</span>
-        <span className="max-w-full truncate text-xs text-muted-foreground">
-          Switcher not yet implemented
-        </span>
-      </button>
+      <BusinessSwitcher />
       <div className="ml-auto">
         <DropdownMenu
           label="Account"

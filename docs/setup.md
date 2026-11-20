@@ -418,7 +418,11 @@ The other `VITE_FIREBASE_*` keys can be any non-empty placeholder when the emula
 
 A build aimed at the live project uses `.env.production`. It sets `VITE_USE_FIREBASE_EMULATORS=false` and `VITE_FIREBASE_PROJECT_ID=magemai`, and fills the other `VITE_FIREBASE_*` keys from the web app config in the Firebase console for project number `122706427013`. Those values are public web config, not a service account. They are still not committed. Copy them into the gitignored env file when a cloud build is actually needed. This documentation change does not add them. Another project later would be a different gitignored env file with a different `VITE_FIREBASE_PROJECT_ID`. Do not add that file now.
 
-A production build fails in `vite.config.ts` when `VITE_USE_FIREBASE_EMULATORS` is `true`, and the client throws on startup if that build still tries to connect to an emulator. Live access during `npm run dev` needs both `VITE_USE_FIREBASE_EMULATORS=false` and `VITE_ALLOW_LIVE_FIREBASE=true` in gitignored `.env.development.local`, and it shows the banner in architecture section 24.6. Leaving the live flag unset keeps development on the emulators.
+A production build fails in `vite.config.ts` when `VITE_USE_FIREBASE_EMULATORS` is `true`. The same build also fails, before Vite emits a bundle, when any of `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, or `VITE_FIREBASE_APP_ID` is missing. That stops `npm run deploy:hosting` from publishing a bundle that opens and shows "Firebase is unavailable".
+
+Save `.env.local` and `.env.production` as UTF-8 without a BOM. On Windows, Notepad and some editors write a UTF-8 BOM. Vite then treats the first name as `\uFEFFVITE_FIREBASE_API_KEY` instead of `VITE_FIREBASE_API_KEY`, drops the API key, and the deployed app shows "Firebase is unavailable". The production build check reports that missing key. If the error names `VITE_FIREBASE_API_KEY` and the line looks present, re-save the file without a BOM.
+
+`VITE_FIREBASE_APP_CHECK_SITE_KEY` is not required for the build. It stays empty until App Check is configured.
 
 `VITE_FIREBASE_APP_CHECK_SITE_KEY` is empty locally and set in `.env.production` after App Check is configured on `magemai`.
 
@@ -558,7 +562,7 @@ With `.env.local` in place (section 2.7):
 npm run dev
 ```
 
-The Vite URL is http://127.0.0.1:5173. The app uses project `magemai`. Create an account on `/register`, verify the email from the real inbox, then sign in. The personal profile is `/profile`. `/business/register` is the onboarding wizard. It needs the deploy in section 11 and `npm run seed:platform-settings` before a business can be saved. After a successful create, the app stores `magemai.activeBusinessId` and opens `/admin`. The business switcher is a later step.
+The Vite URL is http://127.0.0.1:5173. The app uses project `magemai`. Create an account on `/register`, verify the email from the real inbox, then sign in. The personal profile is `/profile`. `/business/register` is the onboarding wizard. It needs the deploy in section 11 and `npm run seed:platform-settings` before a business can be saved. After a successful create, the app stores `magemai.activeBusinessId` and opens `/admin`. The header switcher lists every active membership. A stored id that is no longer an active membership falls back to the newest one, or back to the wizard when there are none. `/admin/profile` and `/admin/settings` save through `updateBusinessProfile` and `updateBusinessSettings`. Those two callables are not on the live project until the next `npm run deploy:functions`. The audit read rule needs `npm run deploy:rules` before an owner can read business audit rows in production. No new Firestore index is required for this step.
 
 Create businesses through that wizard. Do not add a hard-coded tenant.
 

@@ -27,6 +27,14 @@ describe("business navigation", () => {
     );
 
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByRole("link", { name: "Business profile" })).toHaveAttribute(
+      "href",
+      "/admin/profile",
+    );
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
+      "href",
+      "/admin/settings",
+    );
     for (const label of comingSoonLabels) {
       const control = screen.getByRole("button", { name: new RegExp(label) });
       expect(control).toBeDisabled();

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ActiveBusinessProvider } from "@/app/providers/active-business-provider";
 import { AuthProvider } from "@/app/providers/auth-provider";
 import { FirebaseProvider } from "@/app/providers/firebase-provider";
 import { QueryProvider } from "@/app/providers/query-provider";
@@ -9,8 +10,10 @@ export function AppProviders({ children }: { children: ReactNode }) {
     <QueryProvider>
       <FirebaseProvider>
         <AuthProvider>
-          {children}
-          <Toaster />
+          <ActiveBusinessProvider>
+            {children}
+            <Toaster />
+          </ActiveBusinessProvider>
         </AuthProvider>
       </FirebaseProvider>
     </QueryProvider>

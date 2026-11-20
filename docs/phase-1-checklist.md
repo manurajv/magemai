@@ -158,19 +158,19 @@ Maps to AC-5, AC-6, AC-7, AC-14, AC-15.
 
 Maps to AC-7, AC-8, AC-9, AC-15, AC-16.
 
-- [ ] `ActiveBusinessProvider` restores `magemai.activeBusinessId` only when that id is an active membership. Otherwise it selects the newest active membership, or sends the user to onboarding.
-- [ ] Query keys include `businessId`. Switching does not leave the previous business's name or fields on screen.
-- [ ] Switcher shows each membership's business name and role.
-- [ ] Sidebar, header, switcher, and user menu match architecture section 5.5, including the drawer below `lg`.
-- [ ] `/admin` overview shows real fields only: name, role, status, verification. The activity area is an empty state that names later phases. No fabricated counts.
-- [ ] `/admin/profile` reads the business and saves through `updateBusinessProfile` for owner, admin, and manager.
-- [ ] `/admin/settings` saves timezone, currency, and language through `updateBusinessSettings` for owner and admin.
-- [ ] Staff can open the shell and read the profile. Staff cannot edit settings or read audit (OQ-28). Rules tests cover this principal, using an Admin SDK membership because invites are Phase 2.
-- [ ] Suspended business: shell opens, banner shows, edits disabled.
-- [ ] Coming soon, disabled, in the business nav: Services, Packages, Bookings, Calendar, Customers, Team, Finances, Invoices, Collaboration, Projects, Reports. No routes and no mock records.
-- [ ] Anonymous and unverified users do not see dashboard data (AC-9).
-- [ ] Component test: switcher with two memberships.
-- [ ] Layout checked at mobile, tablet, and desktop widths (AC-16).
+- [x] `ActiveBusinessProvider` restores `magemai.activeBusinessId` only when that id is an active membership. Otherwise it selects the newest active membership, or sends the user to onboarding.
+- [x] Query keys include `businessId`. Switching does not leave the previous business's name or fields on screen.
+- [x] Switcher shows each membership's business name and role.
+- [x] Sidebar, header, switcher, and user menu match architecture section 5.5, including the drawer below `lg`.
+- [x] `/admin` overview shows real fields only: name, role, status, verification. The activity area is an empty state that names later phases. No fabricated counts.
+- [x] `/admin/profile` reads the business and saves through `updateBusinessProfile` for owner, admin, and manager.
+- [x] `/admin/settings` saves timezone, currency, and language through `updateBusinessSettings` for owner and admin.
+- [x] Staff can open the shell and read the profile. Staff cannot edit settings or read audit (OQ-28). Rules tests cover this principal, using an Admin SDK membership because invites are Phase 2.
+- [x] Suspended business: shell opens, banner shows, edits disabled.
+- [x] Coming soon, disabled, in the business nav: Services, Packages, Bookings, Calendar, Customers, Team, Finances, Invoices, Collaboration, Projects, Reports. No routes and no mock records.
+- [x] Anonymous and unverified users do not see dashboard data (AC-9).
+- [x] Component test: switcher with two memberships.
+- [x] Layout checked at mobile, tablet, and desktop widths (AC-16).
 
 ## Step 8 — Super-admin
 

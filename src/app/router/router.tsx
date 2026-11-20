@@ -4,6 +4,8 @@ import { DashboardLayout } from "@/app/layouts/dashboard-layout";
 import { PublicLayout } from "@/app/layouts/public-layout";
 import { SuperAdminLayout } from "@/app/layouts/super-admin-layout";
 import { AdminPage } from "@/app/pages/admin-page";
+import { BusinessProfilePage } from "@/app/pages/business-profile-page";
+import { BusinessSettingsPage } from "@/app/pages/business-settings-page";
 import { AuthActionPage } from "@/app/pages/auth-action-page";
 import { ForgotPasswordPage } from "@/app/pages/forgot-password-page";
 import { HomePage } from "@/app/pages/home-page";
@@ -73,7 +75,11 @@ export const router = createBrowserRouter([
         children: [
           {
             element: <DashboardLayout />,
-            children: [{ path: "/admin", element: <AdminPage /> }],
+            children: [
+              { path: "/admin", element: <AdminPage /> },
+              { path: "/admin/profile", element: <BusinessProfilePage /> },
+              { path: "/admin/settings", element: <BusinessSettingsPage /> },
+            ],
           },
           {
             element: <SuperAdminLayout />,

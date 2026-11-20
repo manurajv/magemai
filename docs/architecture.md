@@ -761,7 +761,7 @@ A member allow touches the membership document (`exists` plus `get`). A platform
 | `platformSettings/global` | Any signed-in `get` | Denied |
 | `platformSettings/{other}` | Active platform admin | Denied |
 | `platformAdmins/{uid}` | Own `get` if signed in. Any `get`, and `list`, if an active platform admin. | Denied |
-| `auditLogs/{id}` | Active platform admin, or owner/admin of that business for `scope == "business"` | Denied |
+| `auditLogs/{id}` | Active platform admin, or owner/admin of that business for `scope == "business"`. Managers and staff cannot read the log. | Denied |
 | anything else | Denied | Denied |
 
 Rules do not grant access because an id is hard to guess. They do not read a role from the request body. They do not treat `ownerId` on the business as proof of ownership.
