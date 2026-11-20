@@ -1,6 +1,6 @@
 # Phase 1 completion report
 
-Phase 1 is the foundation: accounts, business onboarding, the business dashboard, and platform administration. This report records what is in the repository after the security review, the booking-link wording, and the super-admin token refresh. It does not start Phase 2.
+Phase 1 is the foundation: accounts, business onboarding, the business dashboard, and platform administration. This report records what is in the repository after the security review, the booking-link wording, the super-admin token refresh, and the two live-bug fixes below. It does not start Phase 2. Nothing in this branch has been deployed.
 
 ## Acceptance criteria
 
@@ -30,7 +30,8 @@ Open:
 
 ## What was built
 
-- Email and password registration, sign-in, email verification, password reset, and a profile with an avatar.
+- Email and password registration, sign-in, email verification, password reset, and a profile with an avatar. A verification link that still carries `oobCode` is applied in the app. A continue URL of `/auth/action?flow=verifyEmail` (the hosted handler already applied the code) reloads the signed-in user and refreshes the ID token, then shows "Email verified" and opens the app. A signed-out visit shows the same confirmation and goes to sign-in. "I've verified" and Resend reload the user before they decide the address is still unverified.
+- Callable handlers call `adminApp()` and pass that app into `getAuth`, `getFirestore`, and `getStorage`. A side-effect import of the Admin SDK was leaving the default app unset under the functions dynamic import, so every live callable returned INTERNAL. An unexpected callable error is shown as "Something went wrong on our side. Try again in a moment."
 - Google sign-in with `signInWithRedirect` when `VITE_GOOGLE_AUTH_ENABLED` is true.
 - Business onboarding. The first field is the Magemai booking link. It is generated from the business name until the person edits it, and the page shows `https://magemai.web.app/business/<slug>`. That path is the public booking URL from the blueprint. The route is not registered in Phase 1, so the preview is the address the later phase will serve. "Your own website" stays optional and must be `https://` when it is filled in.
 - A dashboard with a business switcher, profile, and settings. Suspended businesses stay visible and cannot be edited.
@@ -134,7 +135,7 @@ Commands run on this machine:
 | Command | Result |
 | --- | --- |
 | `npm run lint` | Passed. |
-| `npm test` | 24 files, 99 tests passed. |
+| `npm test` | 26 files, 107 tests passed. |
 | `npm run typecheck` | Passed for the app and for `functions`. |
 | `npm run test:rules` | 8 files, 48 tests passed, on `demo-magemai`. |
 | `npm run test:e2e` | 29 passed, 16 skipped, on `demo-magemai`. |
@@ -142,7 +143,9 @@ Commands run on this machine:
 
 The first full Playwright run reported 27 passed, 2 failed, and 16 skipped. The failures were the Google emulator account list (the email field is hidden until "Add new account") and a strict-mode locator that matched "Owner" in both the switcher and the dashboard. Both were test fixes. The confirming `npm run test:e2e` then reported 29 passed and 16 skipped.
 
-The first GitHub Actions run of `npm run test:all` failed the same desktop auth test at the password-reset step. Sign-out had not finished, so `/forgot-password` still saw a signed-in session and the guest route sent the browser to `/admin`. The test now waits for the Sign in heading before opening that page. A desktop re-run of `tests/e2e/auth.spec.ts` passed 2 tests. The rest of the suite was not re-run for that one-line wait.
+The first GitHub Actions run of `npm run test:all` failed the same desktop auth test at the password-reset step. Sign-out had not finished, so `/forgot-password` still saw a signed-in session and the guest route sent the browser to `/admin`. The test now waits for the Sign in heading before opening that page.
+
+After the callable and email-verification fixes, the commands in the table were run again. `npm run test:e2e` exercises `checkSlugAvailability`, `createBusiness`, and `syncAuthProfile` on the emulators. An intermediate full Playwright run failed the verification step because React strict mode applied the out-of-band code twice. The page now applies each code once. The confirming `npm run test:e2e` is the 29 passed count in the table.
 
 Not run:
 

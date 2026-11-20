@@ -73,10 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!current) return false;
         await current.reload();
         await current.getIdToken(true);
-        bootstrapped.current.delete(current.uid);
-        await bootstrapAuthUser(current, "sign-in");
-        bootstrapped.current.add(current.uid);
         applyUser(current);
+        try {
+          await bootstrapAuthUser(current, "sign-in");
+        } catch (error) {
+          console.error(error);
+        }
         return current.emailVerified;
       },
     }),

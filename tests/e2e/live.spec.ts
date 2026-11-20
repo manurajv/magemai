@@ -12,10 +12,9 @@ function liveAdmin() {
   if (process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST) {
     throw new Error("Unset the emulator hosts before npm run test:e2e:live.");
   }
-  if (getApps().length === 0) {
-    initializeApp({ credential: applicationDefault(), projectId: "magemai" });
-  }
-  return { auth: getAuth(), db: getFirestore() };
+  const app =
+    getApps()[0] ?? initializeApp({ credential: applicationDefault(), projectId: "magemai" });
+  return { auth: getAuth(app), db: getFirestore(app) };
 }
 
 async function fillBusiness(page: Page, name: string, slug: string) {

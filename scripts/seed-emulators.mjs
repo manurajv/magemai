@@ -215,9 +215,9 @@ async function ensureBusiness(db, business, uids) {
 async function main() {
   assertLocalProject();
   process.env.METADATA_SERVER_DETECTION = "none";
-  initializeApp({ projectId: DEMO_PROJECT_ID });
-  const auth = getAuth();
-  const db = getFirestore();
+  const app = initializeApp({ projectId: DEMO_PROJECT_ID });
+  const auth = getAuth(app);
+  const db = getFirestore(app);
   const uids = new Map();
   for (const user of USERS) {
     uids.set(user.email, await ensureUser(auth, db, user));

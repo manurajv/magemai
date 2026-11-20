@@ -1,6 +1,6 @@
-import { getApp } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { emulatorBucketName, liveDefaultBucketName } from "../../shared/firebase/bucket.js";
+import { adminApp } from "./admin.js";
 
 /**
  * Emulator uploads land in `<project>.appspot.com`.
@@ -8,12 +8,12 @@ import { emulatorBucketName, liveDefaultBucketName } from "../../shared/firebase
  * `magemai.firebasestorage.app` in us-east1, not the legacy appspot name.
  */
 export function defaultBucket() {
+  const app = adminApp();
   if (process.env.FIREBASE_STORAGE_EMULATOR_HOST) {
     const project =
       process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? "demo-magemai";
-    return getStorage().bucket(emulatorBucketName(project));
+    return getStorage(app).bucket(emulatorBucketName(project));
   }
-  const app = getApp();
   const project =
     app.options.projectId ??
     process.env.GCLOUD_PROJECT ??
@@ -21,7 +21,7 @@ export function defaultBucket() {
     "magemai";
   const configured =
     typeof app.options.storageBucket === "string" ? app.options.storageBucket : undefined;
-  return getStorage().bucket(liveDefaultBucketName(project, configured));
+  return getStorage(app).bucket(liveDefaultBucketName(project, configured));
 }
 
 type ObjectMetadata = {
@@ -51,5 +51,5 @@ export async function clearDownloadToken(file: {
 }
 
 export async function stripDownloadTokens(bucketName: string, objectPath: string): Promise<void> {
-  await clearDownloadToken(getStorage().bucket(bucketName).file(objectPath));
+  await clearDownloadToken(getStorage(adminApp()).bucket(bucketName).file(objectPath));
 }

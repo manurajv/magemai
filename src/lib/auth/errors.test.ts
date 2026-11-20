@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { mapAuthError, PASSWORD_ACCOUNT_MESSAGE } from "@/lib/auth/errors";
+import {
+  mapAuthError,
+  PASSWORD_ACCOUNT_MESSAGE,
+  unexpectedCallableMessage,
+  UNEXPECTED_CALLABLE_MESSAGE,
+} from "@/lib/auth/errors";
 
 describe("mapAuthError", () => {
   it("names the original password method and does not offer linking", () => {
@@ -23,6 +28,16 @@ describe("mapAuthError", () => {
     );
     expect(message).toContain("password");
     expect(message.toLowerCase()).toContain("not linked");
+  });
+
+  it("hides a raw internal callable failure", () => {
+    expect(unexpectedCallableMessage({ code: "functions/internal", message: "INTERNAL" })).toBe(
+      UNEXPECTED_CALLABLE_MESSAGE,
+    );
+    expect(unexpectedCallableMessage(new Error("INTERNAL [500]"))).toBe(
+      UNEXPECTED_CALLABLE_MESSAGE,
+    );
+    expect(unexpectedCallableMessage({ code: "functions/permission-denied" })).toBeNull();
   });
 
   it("explains a short password and a duplicate email", () => {

@@ -7,7 +7,7 @@ import {
   type BusinessRole,
 } from "@shared/permissions";
 import type { BusinessProfileInput, BusinessSettingsInput } from "@shared/validation/business";
-import { firebaseErrorCode } from "@/lib/auth/errors";
+import { firebaseErrorCode, unexpectedCallableMessage } from "@/lib/auth/errors";
 import { getFirebase } from "@/lib/firebase/client";
 
 export type BusinessLifecycle = "active" | "suspended";
@@ -134,6 +134,8 @@ export async function readBusiness(businessId: string): Promise<BusinessRecord> 
 }
 
 export function mapDashboardError(error: unknown): string {
+  const unexpected = unexpectedCallableMessage(error);
+  if (unexpected) return unexpected;
   const code = firebaseErrorCode(error);
   const message = error instanceof Error ? error.message : "";
   if (code === "functions/permission-denied") {

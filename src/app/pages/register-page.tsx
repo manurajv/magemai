@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { mapAuthError } from "@/lib/auth/errors";
+import { emailVerificationSettings } from "@/lib/auth/email-link";
 import { bootstrapAuthUser } from "@/lib/auth/session";
 import { getFirebase } from "@/lib/firebase/client";
 
@@ -44,10 +45,10 @@ export function RegisterPage() {
               input.password,
             );
             await updateProfile(credential.user, { displayName: input.displayName });
-            await sendEmailVerification(credential.user, {
-              url: `${window.location.origin}/auth/action`,
-              handleCodeInApp: false,
-            });
+            await sendEmailVerification(
+              credential.user,
+              emailVerificationSettings(window.location.origin),
+            );
             await bootstrapAuthUser(credential.user).catch((caught: unknown) => {
               console.error(caught);
             });

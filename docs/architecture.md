@@ -163,7 +163,7 @@ Phase 1 registers the routes it actually implements.
 | `/register` | public | Create a user account |
 | `/forgot-password` | public | Send a reset email |
 | `/verify-email` | signed-in, unverified | Holding screen and resend |
-| `/auth/action` | public | Applies an email-verification or password-reset code |
+| `/auth/action` | public | Applies an email-verification or password-reset code, or confirms a hosted verification and continues |
 | `/profile` | signed-in | Personal profile. Not a business membership |
 | `/business/register` | verified user | Onboarding wizard. Step 5 keeps a placeholder on this path |
 | `/admin` | member | Overview |

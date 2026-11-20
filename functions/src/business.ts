@@ -21,9 +21,11 @@ import {
   type BusinessSettingsInput,
   type PlatformSettingsSnapshot,
 } from "../../shared/validation/business.js";
-import "./admin.js";
+import { adminApp } from "./admin.js";
 import "./options.js";
 import { defaultBucket, stripDownloadTokens } from "./storage.js";
+
+adminApp();
 
 const BRAND_KINDS = {
   logo: { field: "logoPath", maxBytes: LOGO_MAX_BYTES, label: "2 MB" },
@@ -44,7 +46,7 @@ function requireVerifiedUser(
 }
 
 async function loadSettings(): Promise<PlatformSettingsSnapshot> {
-  const snap = await getFirestore().doc("platformSettings/global").get();
+  const snap = await getFirestore(adminApp()).doc("platformSettings/global").get();
   if (!snap.exists) {
     throw new HttpsError(
       "failed-precondition",
@@ -74,11 +76,11 @@ async function loadSettings(): Promise<PlatformSettingsSnapshot> {
 }
 
 async function assertAccountActive(uid: string): Promise<void> {
-  const record = await getAuth().getUser(uid);
+  const record = await getAuth(adminApp()).getUser(uid);
   if (record.disabled) {
     throw new HttpsError("permission-denied", "This account is disabled.");
   }
-  const user = await getFirestore().doc(`users/${uid}`).get();
+  const user = await getFirestore(adminApp()).doc(`users/${uid}`).get();
   if (!user.exists || user.get("status") !== "active") {
     throw new HttpsError("failed-precondition", "Your profile is not ready yet. Sign in again.");
   }
@@ -91,12 +93,12 @@ export async function checkSlugAvailability(request: CallableRequest) {
   if (!parsed.success) return { available: false };
   const settings = await loadSettings();
   if (isReservedSlug(parsed.data, settings.reservedSlugs)) return { available: false };
-  const existing = await getFirestore().doc(`businessSlugs/${parsed.data}`).get();
+  const existing = await getFirestore(adminApp()).doc(`businessSlugs/${parsed.data}`).get();
   return { available: !existing.exists };
 }
 
 async function enforceCaps(uid: string): Promise<void> {
-  const db = getFirestore();
+  const db = getFirestore(adminApp());
   const since = Timestamp.fromMillis(Date.now() - CREATION_WINDOW_MS);
   const created = await db
     .collection("businesses")
@@ -132,7 +134,7 @@ export async function createBusiness(request: CallableRequest) {
     throw new HttpsError("invalid-argument", "Choose a different web address.");
   }
 
-  const db = getFirestore();
+  const db = getFirestore(adminApp());
   const slugRef = db.doc(`businessSlugs/${input.slug}`);
   const existingSlug = await slugRef.get();
   if (existingSlug.exists) {
@@ -249,7 +251,7 @@ export async function setBusinessImage(request: CallableRequest) {
     throw new HttpsError("invalid-argument", "Choose a logo or cover image.");
   }
   const spec = BRAND_KINDS[kind];
-  const db = getFirestore();
+  const db = getFirestore(adminApp());
   const member = await db.doc(`businessMembers/${businessId}_${uid}`).get();
   const role = member.get("role");
   if (
@@ -379,7 +381,7 @@ export async function updateBusinessProfile(request: CallableRequest) {
   if (!settings.businessCategories.some((category) => category.id === input.categoryId)) {
     throw new HttpsError("invalid-argument", "Choose a category from the list.");
   }
-  const db = getFirestore();
+  const db = getFirestore(adminApp());
   const businessRef = db.doc(`businesses/${businessId}`);
   const memberRef = db.doc(`businessMembers/${businessId}_${uid}`);
   const auditRef = db.collection("auditLogs").doc();
@@ -456,7 +458,7 @@ export async function updateBusinessSettings(request: CallableRequest) {
   if (!platform.supportedLanguages.includes(input.language)) {
     throw new HttpsError("invalid-argument", "Choose a supported language.");
   }
-  const db = getFirestore();
+  const db = getFirestore(adminApp());
   const businessRef = db.doc(`businesses/${businessId}`);
   const memberRef = db.doc(`businessMembers/${businessId}_${uid}`);
   const auditRef = db.collection("auditLogs").doc();

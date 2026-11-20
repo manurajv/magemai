@@ -52,16 +52,8 @@ test("register, verify, profile, logout, and password reset", async ({
 
   const verifyCode = await latestOob(request, email, "VERIFY_EMAIL");
   await page.goto(`/auth/action?mode=verifyEmail&oobCode=${verifyCode}`);
-  await page.getByRole("button", { name: "Confirm email" }).click();
-  await expect(page.getByRole("status")).toContainText("Email verified");
-  await page.goto("/verify-email");
-  const onboarding = page.getByRole("heading", { name: "Create a business" });
-  const refresh = page.getByRole("button", { name: "I've verified" });
-  await expect(onboarding.or(refresh)).toBeVisible();
-  if (await refresh.isVisible()) {
-    await refresh.click({ timeout: 5_000 }).catch(() => undefined);
-  }
-  await expect(onboarding).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Email verified" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create a business" })).toBeVisible();
 
   await page.goto("/profile");
   await expect(page.getByRole("heading", { name: "Your profile" })).toBeVisible();

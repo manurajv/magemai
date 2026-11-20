@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { mapAuthError } from "@/lib/auth/errors";
+import { emailVerificationSettings } from "@/lib/auth/email-link";
 import { getFirebase } from "@/lib/firebase/client";
 
 export function VerifyEmailPage() {
@@ -27,10 +28,12 @@ export function VerifyEmailPage() {
     setError(null);
     setMessage(null);
     try {
-      await sendEmailVerification(current, {
-        url: `${window.location.origin}/auth/action`,
-        handleCodeInApp: false,
-      });
+      const verified = await auth.reloadUser();
+      if (verified) {
+        navigate("/admin", { replace: true });
+        return;
+      }
+      await sendEmailVerification(current, emailVerificationSettings(window.location.origin));
       setMessage("A new verification message is on its way.");
     } catch (caught) {
       setError(mapAuthError(caught));

@@ -5,7 +5,7 @@ import { ref, uploadBytes } from "firebase/storage";
 import { COVER_MAX_BYTES, LOGO_MAX_BYTES } from "@shared/business/limits";
 import { isAvatarContentType } from "@shared/profile/limits";
 import { type BusinessInput, type PlatformSettingsSnapshot } from "@shared/validation/business";
-import { firebaseErrorCode } from "@/lib/auth/errors";
+import { firebaseErrorCode, unexpectedCallableMessage } from "@/lib/auth/errors";
 import { ACTIVE_BUSINESS_STORAGE_KEY } from "@/lib/auth/session";
 import { getFirebase } from "@/lib/firebase/client";
 
@@ -26,6 +26,8 @@ export function imageRejection(file: File, kind: "logo" | "cover"): string | nul
 }
 
 export function mapBusinessError(error: unknown): string {
+  const unexpected = unexpectedCallableMessage(error);
+  if (unexpected) return unexpected;
   const code = firebaseErrorCode(error);
   const message = error instanceof Error ? error.message : "";
   if (code === "functions/already-exists") return "That address is already taken.";

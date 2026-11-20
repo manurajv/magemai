@@ -1,10 +1,12 @@
-import "./admin.js";
 import { getAuth } from "firebase-admin/auth";
+import { adminApp } from "./admin.js";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { AVATAR_MAX_BYTES, isAvatarContentType } from "../../shared/profile/limits.js";
 import "./options.js";
 import { defaultBucket, stripDownloadTokens as stripObjectTokens } from "./storage.js";
+
+adminApp();
 
 const AVATAR_PATH = (uid: string) => `users/${uid}/avatar`;
 
@@ -27,11 +29,11 @@ export async function syncAuthProfile(request: CallableRequest) {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Sign in before syncing your profile.");
   }
-  const record = await getAuth().getUser(request.auth.uid);
+  const record = await getAuth(adminApp()).getUser(request.auth.uid);
   if (record.disabled) {
     throw new HttpsError("permission-denied", "This account is disabled.");
   }
-  const db = getFirestore();
+  const db = getFirestore(adminApp());
   const ref = db.doc(`users/${record.uid}`);
   const authName = authDisplayName(record.displayName);
   await db.runTransaction(async (tx) => {
@@ -79,7 +81,7 @@ export async function setUserAvatar(request: CallableRequest) {
     throw new HttpsError("unauthenticated", "Sign in before saving a profile photo.");
   }
   const uid = request.auth.uid;
-  const record = await getAuth().getUser(uid);
+  const record = await getAuth(adminApp()).getUser(uid);
   if (record.disabled) {
     throw new HttpsError("permission-denied", "This account is disabled.");
   }
@@ -102,7 +104,7 @@ export async function setUserAvatar(request: CallableRequest) {
     throw new HttpsError("invalid-argument", "Choose a JPEG, PNG, or WebP image up to 2 MB.");
   }
   await stripObjectTokens(bucket.name, path);
-  const db = getFirestore();
+  const db = getFirestore(adminApp());
   const userRef = db.doc(`users/${uid}`);
   const userSnap = await userRef.get();
   if (!userSnap.exists) {
